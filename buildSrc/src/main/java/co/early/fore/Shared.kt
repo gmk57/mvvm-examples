@@ -20,7 +20,7 @@ object Shared {
         const val kotlinx_coroutines_core = "1.6.0"
         // fore optional package dependencies
         const val kotlinx_coroutines_android = "1.6.0"
-        const val androidx_lifecycle_common = "2.2.0"
+        const val androidx_lifecycle_common = "2.4.1"
         const val recyclerview = "1.1.0"
         const val apollo = "2.5.4"
         const val apollo3 = "3.0.0"
