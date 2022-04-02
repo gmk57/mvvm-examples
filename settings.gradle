@@ -1,4 +1,4 @@
-rootProject.name = "android-fore"
+rootProject.name = "mvvm-examples"
 
 // java
 include(":fore-jv-core")
