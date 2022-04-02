@@ -74,6 +74,8 @@ dependencies {
         implementation(project(":fore-kt-android-core"))
     }
 
+    implementation(project(":helpers"))
+
     implementation("androidx.appcompat:appcompat:${Shared.Versions.appcompat}")
     implementation("androidx.constraintlayout:constraintlayout:${Shared.Versions.constraintlayout}")
 

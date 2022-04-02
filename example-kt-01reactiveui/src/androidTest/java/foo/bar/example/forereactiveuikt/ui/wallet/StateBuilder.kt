@@ -3,29 +3,34 @@ package foo.bar.example.forereactiveuikt.ui.wallet
 import androidx.test.rule.ActivityTestRule
 import foo.bar.example.forereactiveuikt.OG
 import foo.bar.example.forereactiveuikt.feature.wallet.Wallet
+import foo.bar.example.forereactiveuikt.feature.wallet.WalletState
 import io.mockk.every
+import io.mockk.mockk
+import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
  *
  */
 class StateBuilder internal constructor(private val mockWallet: Wallet) {
 
+    private val mockWalletState: WalletState = mockk()
+
     internal fun withMobileWalletMaximum(totalFundsAvailable: Int): StateBuilder {
 
         every {
-            mockWallet.mobileWalletAmount
+            mockWalletState.mobileWalletAmount
         } returns totalFundsAvailable
 
         every {
-            mockWallet.savingsWalletAmount
+            mockWalletState.savingsWalletAmount
         } returns 0
 
         every {
-            mockWallet.canDecrease()
+            mockWalletState.canDecrease()
         } returns true
 
         every {
-            mockWallet.canIncrease()
+            mockWalletState.canIncrease()
         } returns false
 
         return this
@@ -34,19 +39,19 @@ class StateBuilder internal constructor(private val mockWallet: Wallet) {
     internal fun withMobileWalletHalfFull(savingsWalletAmount: Int, mobileWalletAmount: Int): StateBuilder {
 
         every {
-            mockWallet.mobileWalletAmount
+            mockWalletState.mobileWalletAmount
         } returns mobileWalletAmount
 
         every {
-            mockWallet.savingsWalletAmount
+            mockWalletState.savingsWalletAmount
         } returns savingsWalletAmount
 
         every {
-            mockWallet.canDecrease()
+            mockWalletState.canDecrease()
         } returns true
 
         every {
-            mockWallet.canIncrease()
+            mockWalletState.canIncrease()
         } returns true
 
         return this
@@ -55,19 +60,19 @@ class StateBuilder internal constructor(private val mockWallet: Wallet) {
     internal fun withMobileWalletEmpty(totalFundsAvailable: Int): StateBuilder {
 
         every {
-            mockWallet.mobileWalletAmount
+            mockWalletState.mobileWalletAmount
         } returns 0
 
         every {
-            mockWallet.savingsWalletAmount
+            mockWalletState.savingsWalletAmount
         } returns totalFundsAvailable
 
         every {
-            mockWallet.canDecrease()
+            mockWalletState.canDecrease()
         } returns false
 
         every {
-            mockWallet.canIncrease()
+            mockWalletState.canIncrease()
         } returns true
 
         return this
@@ -76,6 +81,8 @@ class StateBuilder internal constructor(private val mockWallet: Wallet) {
     fun createRule(): ActivityTestRule<WalletsActivity> {
         return object : ActivityTestRule<WalletsActivity>(WalletsActivity::class.java) {
             override fun beforeActivityLaunched() {
+
+                every { mockWallet.state } returns MutableStateFlow(mockWalletState)
 
                 //inject our mocks so our UI layer will pick them up
                 OG.putMock(Wallet::class.java, mockWallet)
