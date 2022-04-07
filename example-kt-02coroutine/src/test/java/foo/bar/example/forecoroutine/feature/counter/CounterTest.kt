@@ -1,12 +1,14 @@
 package foo.bar.example.forecoroutine.feature.counter
 
-import co.early.fore.kt.core.logging.SystemLogger
-import co.early.fore.core.observer.Observer
 import co.early.fore.kt.core.delegate.Fore
 import co.early.fore.kt.core.delegate.TestDelegateDefault
-import io.mockk.MockKAnnotations
-import io.mockk.mockk
-import io.mockk.verify
+import co.early.fore.kt.core.logging.SystemLogger
+import gmk57.helpers.backgroundDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
 import org.junit.Assert
 import org.junit.Before
 import org.junit.Test
@@ -21,6 +23,9 @@ class CounterTest {
         // make the code run synchronously, reroute Log.x to
         // System.out.println() so we see it in the test log
         Fore.setDelegate(TestDelegateDefault())
+        val dispatcher = StandardTestDispatcher()
+        Dispatchers.setMain(dispatcher)
+        backgroundDispatcher = dispatcher
     }
 
     @Test
@@ -33,33 +38,36 @@ class CounterTest {
         //act
 
         //assert
-        Assert.assertEquals(false, counter.isBusy)
-        Assert.assertEquals(0, counter.count.toLong())
+        val state = counter.state.value
+        Assert.assertEquals(false, state.isBusy)
+        Assert.assertEquals(0, state.count.toLong())
     }
 
 
     @Test
     @Throws(Exception::class)
-    fun increasesBy20() {
+    fun increasesBy20() = runTest {
 
         //arrange
         val counter = Counter(logger)
 
         //act
         counter.increaseBy20()
+        advanceUntilIdle()
 
         //assert
-        Assert.assertEquals(false, counter.isBusy)
-        Assert.assertEquals(20, counter.count.toLong())
+        val state = counter.state.value
+        Assert.assertEquals(false, state.isBusy)
+        Assert.assertEquals(20, state.count.toLong())
     }
 
 
     /**
      *
-     * NB all we are checking here is that observers are called AT LEAST once
+     * NB all we are checking here is that counter state has changed
      *
      * We don't really want tie our tests (OR any observers in production code)
-     * to an expected number of times this method might be called. (This would be
+     * to an expected number of times it has changed. (This would be
      * testing an implementation detail and make the tests unnecessarily brittle)
      *
      * The contract says nothing about how many times the observers will get called,
@@ -72,20 +80,17 @@ class CounterTest {
      */
     @Test
     @Throws(Exception::class)
-    fun observersNotifiedAtLeastOnce() {
+    fun stateHasChanged() {
 
         //arrange
         val counter = Counter(logger)
-        val mockObserver = mockk<Observer>(relaxed = true)
-        counter.addObserver(mockObserver)
+        val initialState = counter.state.value
 
         //act
         counter.increaseBy20()
 
         //assert
-        verify(atLeast = 1) {
-            mockObserver.somethingChanged()
-        }
+        Assert.assertNotEquals(initialState, counter.state.value)
     }
 
     companion object {

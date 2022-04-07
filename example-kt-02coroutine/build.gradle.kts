@@ -51,7 +51,10 @@ android {
         }
         getByName(BuildTypes.RELEASE) {
             isMinifyEnabled = true
-            proguardFiles(getDefaultProguardFile("proguard-android.txt"), "../proguard-example-app.pro")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android.txt"),
+                "../proguard-example-app.pro"
+            )
             signingConfig = signingConfigs.getByName(BuildTypes.RELEASE)
         }
     }
@@ -74,11 +77,15 @@ dependencies {
         implementation(project(":fore-kt-android-core"))
     }
 
+    implementation(project(":helpers"))
+    implementation("androidx.core:core-ktx:${Shared.Versions.android_core}")
+
     implementation("androidx.appcompat:appcompat:${Shared.Versions.appcompat}")
     implementation("androidx.constraintlayout:constraintlayout:${Shared.Versions.constraintlayout}")
 
     testImplementation("junit:junit:${Shared.Versions.junit}")
     testImplementation("io.mockk:mockk:${Shared.Versions.mockk}")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Shared.Versions.kotlinx_coroutines_core}")
 
     androidTestImplementation("io.mockk:mockk-android:${Shared.Versions.mockk}")
     androidTestImplementation("androidx.test:core:${Shared.Versions.androidxtest}")

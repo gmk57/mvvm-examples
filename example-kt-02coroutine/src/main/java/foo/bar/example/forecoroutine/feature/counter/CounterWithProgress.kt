@@ -1,43 +1,41 @@
 package foo.bar.example.forecoroutine.feature.counter
 
 
-import co.early.fore.core.WorkMode
 import co.early.fore.kt.core.logging.Logger
-import co.early.fore.core.observer.Observable
-import co.early.fore.kt.core.coroutine.*
-import co.early.fore.kt.core.delegate.Fore
-import co.early.fore.kt.core.observer.ObservableImp
+import gmk57.helpers.appScope
+import gmk57.helpers.backgroundDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Copyright © 2019 early.co. All rights reserved.
  */
 class CounterWithProgress(
-        private val logger: Logger
-) : Observable by ObservableImp(logger = logger) {
+    private val logger: Logger
+) {
 
-    var isBusy = false
-        private set
-    var count: Int = 0
-        private set
-    var progress: Int = 0
-        private set
+    private val _state = MutableStateFlow(CounterState())
+    val state: StateFlow<CounterState> = _state
 
 
     fun increaseBy20() {
 
         logger.i("increaseBy20() t:" + Thread.currentThread())
 
-        if (isBusy) {
+        if (state.value.isBusy) {
             return
         }
 
-        isBusy = true
-        notifyObservers()
+        _state.update { it.copy(isBusy = true) }
 
-        launchMain {
+        appScope.launch(Dispatchers.Main.immediate) {
 
-            val result = awaitDefault {
+            val result = withContext(backgroundDispatcher) {
                 doStuffInBackground(20)
             }
 
@@ -54,11 +52,11 @@ class CounterWithProgress(
 
         for (ii in 1..countTo) {
 
-            delay((if (Fore.getWorkMode() == WorkMode.SYNCHRONOUS) 1 else 100).toLong())
+            delay(200)
 
             ++totalIncrease
 
-            launchMain {
+            withContext(Dispatchers.Main) {
                 publishProgress(totalIncrease)
             }
 
@@ -73,8 +71,7 @@ class CounterWithProgress(
 
         logger.i("publishProgress() t:" + Thread.currentThread())
 
-        progress = value
-        notifyObservers()
+        _state.update { it.copy(progress = value) }
     }
 
 
@@ -82,9 +79,12 @@ class CounterWithProgress(
 
         logger.i("doThingsWithTheResult() t:" + Thread.currentThread())
 
-        count += result
-        progress = 0
-        isBusy = false
-        notifyObservers()
+        _state.update {
+            it.copy(
+                count = it.count + result,
+                progress = 0,
+                isBusy = false
+            )
+        }
     }
 }

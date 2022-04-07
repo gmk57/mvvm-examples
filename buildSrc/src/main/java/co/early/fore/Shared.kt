@@ -17,9 +17,9 @@ object Shared {
         // fore core package dependencies
         const val android_gradle_plugin = "7.0.4"
         const val kotlin_version = "1.6.10"
-        const val kotlinx_coroutines_core = "1.6.0"
+        const val kotlinx_coroutines_core = "1.6.1"
         // fore optional package dependencies
-        const val kotlinx_coroutines_android = "1.6.0"
+        const val kotlinx_coroutines_android = "1.6.1"
         const val androidx_lifecycle_common = "2.4.1"
         const val recyclerview = "1.1.0"
         const val apollo = "2.5.4"
@@ -27,7 +27,7 @@ object Shared {
         const val retrofit = "2.9.0"
         const val compose = "1.1.0"
         // example app and test dependencies
-        const val android_core = "1.1.0"
+        const val android_core = "1.7.0"
         const val annotation = "1.0.0"
         const val material = "1.1.0"
         const val appcompat = "1.1.0"
