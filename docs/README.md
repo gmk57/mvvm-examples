@@ -1,387 +1,66 @@
-# android fore
+# MVVM examples
 
-[![license-apache2](https://img.shields.io/badge/license-Apache%202-blue.svg)](https://github.com/erdo/android-fore/blob/master/LICENSE.txt){: .float-left}
+This is an attempt to show and compare various approaches to writing declarative & reactive view layer on Android.
 
-![central-1.5.9](https://img.shields.io/badge/central-1.5.9-green.svg){: .float-left}
+## Motivation
 
-![api-16](https://img.shields.io/badge/api-16%2B-orange.svg){: .float-left}
+The idea of it came after reading [a great series of articles](https://dev.to/erdo/tutorial-spot-the-deliberate-bug-165k) on this topic by Eric Donovan, please have a look to better understand what follows. His main point might seem obvious, and personally, I've been using a similar approach for many years, but I've seen developers struggling with it, writing imperative UI code with a lot of boilerplate and creeping bugs. So it certainly deserves more guidance.
 
-[![circleci](https://circleci.com/gh/erdo/android-fore/tree/master.svg?style=shield)](https://circleci.com/gh/erdo/android-fore/tree/master){: .float-left}
+A few months ago Google's Android team published a new [Guide to app architecture](https://developer.android.com/jetpack/guide), centered on Unidirectional data flow (UDF). It is a big step forward, probably inspired by Jetpack Compose, but the same principles can and should be followed with classic Android View system, and Google's guide lacks specific examples of how to do that. Moreover, Google [recommends cold/warm Flows and special collectors](https://medium.com/androiddevelopers/a-safer-way-to-collect-flows-from-android-uis-23080b1f8bda) to implicitly propagate view lifecycle to domain layer, which [I think is not a good idea](https://gmk57.medium.com/thanks-you-have-a-very-good-point-23a394b44a66) because of increased complexity and hidden coupling of domain layer to view implementation details.
 
-<br/>
-<br/>
+## Starting point
 
-[(click here if you're reading this on github)](https://erdo.github.io/android-fore/#shoom)
+Technically, this repository is a fork of Eric's [fore library](https://github.com/erdo/android-fore). I've chosen it as a starting point because it contains various sample apps, seemingly custom-tailored to my goals:
+1) They are simple enough to see easily what's going on, but realistic enough to show the techniques applicable to real apps
+1) View itself is already written in declarative & reactive style, with a single `syncView()` function
+1) The code has a good test coverage
 
-**fore** helps you move code out of the view layer, leaving your reactive view code to deal with the absolute fundamentals: *what things look like*
+## StateFlow
 
-## Quick Start
+On the other hand, for non-Compose apps I prefer to implement Observer pattern via `StateFlow` from Kotlin Coroutines, which has many useful properties:
+* It can be observed ;)
+* Its behavior does not depend on the presence and count of observers
+* It caches the latest value
+* It has a built-in conflation/deduplication (like `distinctUntilChanged()` in a regular `Flow`)
+* It can be updated atomically with recently added `update()` method
+* Its `value` can be queried synchronously, which is very handy in some cases
+* It is able to pass `null` values (in contrast to RxJava) and respects declared nullability (in contrast to `LiveData`)
+* There is a ready-made `stateIn()` for converting any `Flow` to `StateFlow`
 
-```
-implementation("co.early.fore:fore-kt-android:1.5.9")
-```
+Typically ViewModel (or any other class that should be observed) exposes all its state in a `StateFlow<SomeState>`, where `SomeState` is a data class.
+Compared to fore-based approach, there are some differences:
+1) No need to wire observation manually: to call `notifyObservers()`, `removeObserver()`, or call `syncView()` again after `addObserver()`. Less boilerplate, but more importantly, less error-prone: no chances to forget adding these calls.
+1) Updating state may be slightly more verbose (though often it's still one-liner), but on the other side, we don't need getters or `private set` for every single piece of state. Hopefully it will be more convenient when/if Kotlin gets [value classes](https://github.com/Kotlin/KEEP/blob/master/notes/value-classes.md).
+1) `StateFlow.update()` is thread-safe & atomic. This is not always important, but again, lowers chances of bugs.
 
-More detailed [version information here](https://erdo.github.io/android-fore/06-upgrading.html#shoom).
+## What I've changed
 
-## Compose
+I'm migrating Kotlin versions of sample apps one by one, so hopefully the list below will grow over time.
 
-For Compose, use fore's observeAsState() function (the versioning matches compose itself)
-```
-implementation("co.early.fore:fore-kt-android-compose:1.1.0")
-```
+The main goal is to compare different approaches, from the perspective of code clarity, testability, supporting configuration changes, etc.
 
-## New to fore
+That's why I make as little changes as possible, and preserve some *fore* parts not related to state management (e.g. logging, service locator). For the same reason *fore* library modules and Java examples are left intact. Original fore-based implementation is kept in [original_fore](/../../tree/original_fore) branch, so you can easily diff branches on GitHub or in IDE.
 
-**fore** is a small library, plus a selection of techniques. You could just use the techniques and implement the library yourself, though fore has evolved from years of use in various production android apps, so you'll find some optimisations in it that might not be immediately obvious (optimisations = simplifications which result in less complex client code).
+### 1 Reactive UI Example: [description](https://erdo.github.io/android-fore/#fore-1-reactive-ui-example), [code](/example-kt-01reactiveui)
 
-**fore** doesn't do everything for you (it doesn't do much actually) you have to understand where and how to use it, which is why there is so much focus on these docs and the sample apps.
+Parts of the `Wallet` logic were moved to `WalletState`. `WalletsActivity` got rid of wiring boilerplate.
 
-The quickest integration, observe your model(s)
+In tests, instead of verifying that observer was called, we should check that state has changed. We can test `WalletState` separately, including cases that were harder to test previously (large numbers, `totalDollarsAvailable` != 10). `StateBuilder` was simplified, it can use regular `WalletState` instead of mocks.
 
-```
-override fun onCreate(savedInstanceState: Bundle?) {
-    super.onCreate(savedInstanceState)
+### 2 Asynchronous Code Example: [description](https://erdo.github.io/android-fore/#fore-2-asynchronous-code-example), [code](/example-kt-02coroutine)
 
-    //setup observers
-    lifecycle.addObserver(LifecycleObserver(this, viewModel))
+`CounterState` is extracted & reused between `Counter` and `CounterWithProgress`. Tricky part: `CounterActivity` needs data from two sources. In this particular case we could just split `syncView()` into two separate methods, but in general it may not be possible, so instead we combine two `Flow`s into one. Anyway, it's less code than before.
 
-    ....
-}
-```
+Production code got rid of checking `Fore.getWorkMode()` in `delay()`, `launchMain()` and `awaitDefault()`. Instead, we use `TestDispatcher` and `runTest()` from `kotlinx-coroutines-test` library to advance virtual time step by step. The only adjustment of production code specifically for testing is a `backgroundDispatcher` (here a top-level property, but normally passed via dependency injection).
 
-and then implement the syncView() function
+## Jetpack Compose
 
-```
-//called on the UI thread, whenever the viewModel state changes
-override fun syncView() {
-    viewModel.viewState.apply {
-        dashboard_busy.showOrInvisible(isLoading)
-        dashboard_updatenow_btn.isEnabled = !isLoading
-        dashboard_pollenlevel_img.setImageResource(pollenLevel.toImgRes())
-        ...
-    }
-}
-```
-Full examples: [here](https://github.com/erdo/persista/blob/main/example-app/src/main/java/foo/bar/example/ui/wallet/WalletsActivity.kt) and [here](https://github.com/erdo/clean-modules-sample/blob/main/app/ui/src/main/java/foo/bar/clean/ui/dashboard/DashboardActivity.kt)
-
-## Overview
-
-Imagine your app existing entirely separately from its UI (its UI could be a command line interface, or a GUI, compose or otherwise - the app shouldn't care or even know what type of UI it has). Then imagine the UI layer as a thin window on to this app, free to deal exclusively with _what things look like_.
-
-This level of separation is a goal of lots of architectures and it's a great way to develop anything that has a UI. It's especially helpful for a platform like android with its ephemeral view layer that gets destroyed and recreated on rotation. It also lets you junit test almost everything, the UI layer becoming as close to trivial as possible.
-
-### Observers and Observables
-
-This is the kind of challenge that the [observer pattern](https://en.wikipedia.org/wiki/Observer_pattern) has been solving for decades. And the main innovation in fore is its radically simplified observer implementation. It lets you decouple architectural layers to a degree that would not normally be possible.
-
-At this point, you might be thinking that fore is a reactive streams library like Rx. In fact (other than the observer pattern) fore and reactive streams have very little to do with each other, and it's perfectly possible to find them both in the same project.
-
-While connecting architectural layers with reactive streams is often done, it usually (always?) results in more code in the view layer when compared with a fore style solution. Plus this additional code needs to consider lifecycle issues which are only present in the view layer. This boilerplate difference becomes steadily more apparent as app complexity increases (this explains [why](https://erdo.github.io/android-fore/03-reactive-uis.html#somethingchanged-parameter)).
-
-On the other hand, processing and combining data streams in the data layer on different threads using fore would be pointless, and a natural fit for something like Rx or Flow.
-
-**fore**'s observable classes basically let you **make anything observable** from the perspective of the UI thread (usually it's repositories or classes in the domain layer that are made **observable**, and things in the view layer like activities, fragments or custom views do the **observing**). Here's how you make an AccountRepository class observable for example (no need to use a Repository for this, it works with any class):
-
-
-<!-- Tabbed code sample -->
- <div class="tab">
-   <button class="tablinks java" onclick="openLanguage('java')">Java</button>
-   <button class="tablinks kotlin" onclick="openLanguage('kotlin')">Kotlin</button>
- </div>
-
-<pre class="tabcontent tabbed java"><code>
-public class AccountRepository extends ObservableImp {
-
-  public AccountRepository(WorkMode workMode) {
-    super(workMode);
-  }
-
-  ...
-
-}
- </code></pre>
-
-<pre class="tabcontent tabbed kotlin"><code>
-class AccountRepository
-: Observable by ObservableImp() {
-
-  ...
-
-}
- </code></pre>
-
-
- Somewhere in the view layer (Activity/Fragment/View or ViewModel) there will be a piece of code like this:
-
-
- <!-- Tabbed code sample -->
-  <div class="tab">
-    <button class="tablinks java" onclick="openLanguage('java')">Java</button>
-    <button class="tablinks kotlin" onclick="openLanguage('kotlin')">Kotlin</button>
-  </div>
-
- <pre class="tabcontent tabbed java"><code>
- Observer observer = this::syncView;
-  </code></pre>
-
- <pre class="tabcontent tabbed kotlin"><code>
- val observer = Observer { syncView() }
-  </code></pre>
-
-
-And that observer is typically added and removed from the observable in line with lifecycle methods so that we dont get any memory leaks. In the case below, a fragment is observing a Wallet [model](https://en.wikipedia.org/wiki/Domain_model) representing the details of a user's wallet.
-
-<!-- Tabbed code sample -->
- <div class="tab">
-   <button class="tablinks java" onclick="openLanguage('java')">Java</button>
-   <button class="tablinks kotlin" onclick="openLanguage('kotlin')">Kotlin</button>
- </div>
-
-<pre class="tabcontent tabbed java"><code>
-@Override
-protected void onStart() {
-    super.onStart();
-    wallet.addObserver(observer);
-    syncView(); //  <- don't forget this
-}
-
-@Override
-protected void onStop() {
-    super.onStop();
-    wallet.removeObserver(observer);
-}
- </code></pre>
-
-<pre class="tabcontent tabbed kotlin"><code>
-override fun onStart() {
-    super.onStart()
-    wallet.addObserver(observer)
-    syncView() //  <- don't forget this
-}
-
-override fun onStop() {
-    super.onStop()
-    wallet.removeObserver(observer)
-}
- </code></pre>
-
-All that's left to do now is to implement **syncView()** which will be called on the UI thread whenever the state of your observables change. You'll probably notice that syncView() shares some characteristics with MVI's render() or MvRx's invalidate(), though you might be surprised to learn that fore has been using syncView() to implement unidirectional data flow since at least 2013!
-
-<!-- Tabbed code sample -->
- <div class="tab">
-   <button class="tablinks java" onclick="openLanguage('java')">Java</button>
-   <button class="tablinks kotlin" onclick="openLanguage('kotlin')">Kotlin</button>
- </div>
-
-<pre class="tabcontent tabbed java"><code>
-public void syncView(){
-    increaseMobileWalletBtn.setEnabled(wallet.canIncrease());
-    decreaseMobileWalletBtn.setEnabled(wallet.canDecrease());
-    mobileWalletAmount.setText("" + wallet.getMobileWalletAmount());
-    savingsWalletAmount.setText("" + wallet.getSavingsWalletAmount());
-}
- </code></pre>
-
-<pre class="tabcontent tabbed kotlin"><code>
-override fun syncView() {
-    wallet_increase_btn.isEnabled = wallet.canIncrease()
-    wallet_decrease_btn.isEnabled = wallet.canDecrease()
-    wallet_mobileamount_txt.text = wallet.mobileWalletAmount.toString()
-    wallet_savingsamount_txt.text = wallet.savingsWalletAmount.toString()
-    wallet_balancewarning_img.showOrGone(wallet.mobileWalletAmount<2)
-}
-
-</code></pre>
-
-In this example the wallet state is being exposed via getters / properties, but the state could just as well be exposed via a single immutable state (like in the clean architecture sample linked to below) it's entirely up to you, it makes no difference to the syncView() technique.
-
-**fore** has low boiler-plate overhead anyway, but its structure enables you to go further and remove almost all of it, see [here](https://erdo.github.io/android-fore/03-reactive-uis.html#removing-even-more-boiler-plate) for details.
-
-Making the most of fore's ability to remove boiler plate, a fully reactive, fully testable, memory leak free, rotation supporting view layer can easily come in under 100 lines of code (this listing is complete apart from imports):
-
-<pre class="codesample"><code>
-class DashboardActivity : FragmentActivity(R.layout.activity_dashboard), SyncableView {
-
-    //models that we need to sync with
-    private val viewModel: DashboardViewModel by viewModel()
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-
-        //setup observers
-        lifecycle.addObserver(LifecycleObserver(this, viewModel))
-
-        //setup click listeners
-        dashboard_startautorefresh_btn.setOnClickListener { viewModel.startAutoRefresh() }
-        dashboard_stopautorefresh_btn.setOnClickListener { viewModel.stopAutoRefresh() }
-        dashboard_updatenow_btn.setOnClickListener { viewModel.updateNow() }
-    }
-
-    //called on the UI thread, whenever the viewModel state changes
-    override fun syncView() {
-        viewModel.viewState.apply {
-            dashboard_busy.showOrInvisible(isUpdating)
-            dashboard_updatenow_btn.isEnabled = !isUpdating
-            dashboard_startautorefresh_btn.isEnabled = !autoRefresh.autoRefreshing
-            dashboard_stopautorefresh_btn.isEnabled = autoRefresh.autoRefreshing
-            dashboard_pollenlevel_img.setImageResource(weather.pollenLevel.toImgRes())
-            dashboard_tempmaxmin.setMaxPercent(weather.maxTempPercent())
-            dashboard_tempmaxmin.setMinPercent(weather.minTempPercent())
-        }
-    }
-}
-
-</code></pre>
-
-Writing view layers this way helps quite a bit from a complexity standpoint, and it's one of the things that makes fore suitable for both quick prototypes, and large complex commercial projects with 100K+ lines of code. Specifically _why_ it is that apps written this way are both sparse _and_ scalable is not always immediately obvious though. This [discussion](https://erdo.github.io/android-fore/03-reactive-uis.html#somethingchanged-parameter) gets into the design of the fore api and why it drastically reduces boiler plate for a typical android app compared with alternatives. Some of the dev.to tutorials (see below) also touch on the complexity / robustness aspect.
-
-Here's a very basic example from one of the mini kotlin apps included in the fore repo: [View](https://github.com/erdo/android-fore/blob/master/example-kt-01reactiveui/src/main/java/foo/bar/example/forereactiveuikt/ui/wallet/WalletsActivity.kt) and [Model](https://github.com/erdo/android-fore/blob/master/example-kt-01reactiveui/src/main/java/foo/bar/example/forereactiveuikt/feature/wallet/Wallet.kt) code, and the tests: a [Unit Test](https://github.com/erdo/android-fore/blob/master/example-kt-01reactiveui/src/test/java/foo/bar/example/forereactiveuikt/feature/wallet/WalletTest.kt) for the Model, and an [Espresso Test](https://github.com/erdo/android-fore/blob/master/example-kt-01reactiveui/src/androidTest/java/foo/bar/example/forereactiveuikt/ui/wallet/WalletsActivityTest.kt) for the View
-
-Read more about the [MVO](https://erdo.github.io/android-fore/00-architecture.html#shoom) architecture of fore apps.
-
-### Motivation
-
-There is often a tendency in business requirements towards complexity, the longer a project exists, the more complex it becomes. For an android app to remain maintainable over a period of years, it needs to be able to absorb this complexity without too much damage to the code base. So if there was one guiding principle followed when developing fore and its techniques, it was probably: *complexity is the enemy*.
-
-Simple != Easy but fore aims to get you and your team to Simple (and performant) as quickly as possible so you can spend more time writing features and less time fixing bugs.
-
-[gmk57](https://gmk57.medium.com/) on medium forwarded me a great [comment](https://medium.com/@a.artikov/i-in-my-opinion-this-solution-is-over-complicated-77ce684a4014) which I think applies here: **_In quantum physics there is an effect where observing of a system changes properties of this system_**. That complication is something we are explicity avoiding with fore (the things being observed with fore don't know or even care what is observing them). If you do want to link your UI state to some app behaviour though, that's as easy as: ```onResume(){gpsTracker.start()}``` for example. It doesn't require you to manage any streams of data in order to do that (the fore observers will continue to ensure that the UI reflects the current app state regardless).
-
-Anyway, because of the low boiler plate and the clear separation of architectural layers you get when developing this way, MVO implemented with fore can help you with issues like **code complexity**; **testability**; **UI consistency**; **memory leaks**; and **development speed** - and if you're spending time dealing with any of those issues in your code base or team, it's well worth considering!
-
-## Where to get more information
-
-This repo includes the tiny fore library, the optional packages, and 12 mini example apps. Any updates to fore are immediately reflected in the example apps and all their tests need to pass before new versions of fore are released, so they tend to remain current and are a good place to start if you're trying to figure out how things fit together:
-
-`git clone git@github.com:erdo/android-fore.git`
-
-There are also a few tutorials on dev.to [like this one](https://dev.to/erdo/tutorial-spot-the-deliberate-bug-165k) which demonstrates how the syncView() convention helps you to write less code, while removing a whole class of UI consistency bugs from the UI layer. Or [this one](https://dev.to/erdo/tutorial-android-architecture-blueprints-full-todo-app-mvo-edition-259o) which details the whys and the hows of converting the Android Architecture Blueprint Todo sample app from MVP to [MVO](https://erdo.github.io/android-fore/00-architecture.html#shoom) using fore.
-
-A few other sample apps are listed in the [github project summary](https://github.com/erdo?tab=projects) for android-fore. Like this sample app which uses fore to implement a [clean architecture module](https://github.com/erdo/clean-modules-sample) structure (which now also comes with it's own [article](https://dev.to/erdo/clean-architecture-minus-reactive-streams-10i3)) or the [Apollo3](https://dev.to/erdo/android-apollo3-and-graphql-1e8m) article and sample app on dev.to
-
-The most recent sample comes with the [fore and Compose article](https://dev.to/erdo/tic-tac-toe-from-mvp-to-jetpack-compose-57d8) on dev.to which covers the basics of migrating a tick-tac-toe app from MVP to Compose.
-
-If you have a question about the best way to achieve what you want with fore, consider opening an issue (even better, a stackoverflow question which you can link to from an issue). Also, if you want to write an article related to fore, if you open an issue about it, we might include a link to it from the docs
-
-## Sample Apps
-
-![all samples](img/screenshot_asaf_samples_phone_all_1000.png)
-
-The mini example apps included with the repo are deliberately sparse and ugly so that you can see exactly what they are doing. These are not examples for how to nicely structure XML layouts - all that you can do later in the **View** layers and it should have no impact on the stability of the app, (there is a jetpack compose example on the way incidentally).
-
-These apps are however, totally robust and comprehensively tested (and properly support rotation). And that's really where you should try to get to as quickly as possible, so that you can **then** start doing the fun stuff like adding beautiful graphics and cute animations.
-
-For these example apps, all the **View** components are located in the **ui/** package and the **Models** are in the **feature/** package. This package structure gives the app code good glanceability and should let you find what you want easily.
-
-For the sample apps there is a one-to-one relationship between the sub-packages within **ui/**, and the sub-packages within **feature/** but it needn't be like that and for larger apps it often isn't. You might have one BasketModel but it will be serving both a main BasketView and a BasketIconView located in a toolbar for instance. A more complex view may use data from several different models at the same time eg a BasketModel and an AccountModel.
-
-<div class="shoom" id="fore-1-reactive-ui-example"/>
-### **fore 1** Reactive UI Example
-
-[video](https://www.youtube.com/watch?v=wDu6iaSzKHI) \| [source code (java)](https://github.com/erdo/android-fore/tree/master/example-jv-01reactiveui) \| [source code (kotlin)](https://github.com/erdo/android-fore/tree/master/example-kt-01reactiveui)
-
-![fore reactive UI sample app](img/fore-android-sample-reactive.gif)
-
-This app is a bare bones implementation of a reactive UI. No threading, no networking, no database access - just the minimum required to demonstrate [Reactive UIs](https://erdo.github.io/android-fore/03-reactive-uis.html#shoom). It's still a full app though, supports rotation and has a full set of tests to go along with it.
-
-In the app you move money from a "Savings" wallet to a "Mobile" wallet and then back again. It implements a tiny section of the diagram from the [architecture](https://erdo.github.io/android-fore/00-architecture.html#shoom) section.
-
-
-<div class="shoom" id="fore-2-async-example"/>
-### **fore 2** Asynchronous Code Example
-
-[video](https://www.youtube.com/watch?v=di_xvaYUTxo) \| [source code (java)](https://github.com/erdo/android-fore/tree/master/example-jv-02threading) \| [source code (kotlin)](https://github.com/erdo/android-fore/tree/master/example-kt-02coroutine)
-
-![fore threading sample app](img/fore-android-sample-async.gif)
-
-This one demonstrates asynchronous programming, and importantly how to test it. The **java** version uses ([Async](https://erdo.github.io/android-fore/04-more-fore.html#async) and [AsyncBuilder](https://erdo.github.io/android-fore/04-more-fore.html#asyncbuilder)), the **kotlin** version uses coroutines (with some [fore extensions](https://github.com/erdo/android-fore/blob/master/fore-kt-core/src/main/java/co/early/fore/kt/core/coroutine/Ext.kt) that make the coroutines unit testable). Again, it's a bare bones (but complete and tested) app - just the minimum required to demonstrate asynchronous programming.
-
-This app has a counter that you can increase by pressing a button (but it takes time to do the increasing - so you can rotate the device, background the app etc and see the effect).
-
-<div class="shoom" id="fore-3-adapter-example"/>
-### **fore 3** Adapter Example
-
-[video](https://www.youtube.com/watch?v=eAbyhOyoMxU) \| [source code (java)](https://github.com/erdo/android-fore/tree/master/example-jv-03adapters) \| [source code (kotlin)](https://github.com/erdo/android-fore/tree/master/example-kt-03adapters)
-
-![fore adapters sample app](img/fore-android-sample-adapters.gif)
-
-This one demonstrates how to use [**adapters**](https://erdo.github.io/android-fore/04-more-fore.html#adapter-animations) with **fore**.
-
-The **java** sample has two lists side by side so you can see the how the implementation differs depending on if you are backed by immutable list data (typical in architectures that use view states such as MVI) or mutable list data. As usual it's a complete and tested app but contains just the minimum required to demonstrate adapters.
-
-The **kotlin** version has three lists, adding an implementation of google's **AsyncListDiffer**. All three implementations have slightly different characteristics, most notably the google version moves logic out of the model and into the adapter (that's why it doesn't automatically support rotation - but it could be added easiy enough by passing an external list copy to the adapter). Check the source code for further infomation.
-
-The UI for each app is deliberately challenging to implement on android, and although it's ugly, the UI lets you smash buttons to not only add and remove multiple items, but also to change the state of each item in the list. All changes are animated, it supports rotation, it's totally robust and the UI layer is extremely thin for both apps.
-
-
-<div class="shoom" id="fore-4-retrofit-example"/>
-### **fore 4** Retrofit Example
-
-[video](https://www.youtube.com/watch?v=zOIoK8Fj0Ug) \| [source code (java)](https://github.com/erdo/android-fore/tree/master/example-jv-04retrofit) \| [source code (kotlin)](https://github.com/erdo/android-fore/tree/master/example-kt-04retrofit)
-
-![fore retrofit sample app](img/fore-android-sample-network.gif)
-
-Clicking the buttons in this app will perform network requests to some static files that are hosted on [Mocky](https://www.mocky.io/) (have you seen that thing? it's awesome). The buttons make various network connections, various successful and failed responses are handled in different ways. It's all managed by the [CallProcessor](https://erdo.github.io/android-fore/04-more-fore.html#fore-network) class which is the main innovation in the fore-network library, the kotlin implementation of CallProcessor is implemented with coroutines and has an API better suited to kotlin and functional programming.
-
-As you're using the app, please notice:
-
-- **how you can rotate the device with no loss of state or memory leaks**. I've used Mocky to add a delay to the network request so that you can rotate the app mid-request to clearly see how it behaves (because we have used **fore** to separate the view from everything else, rotating the app makes absolutely no difference to what the app is doing, and the network busy spinners remain totally consistent). Putting the device in airplane mode also gives you consistent behaviour when you attempt to make a network request.
-
-As usual this is a complete and tested app. In reality the tests are probably more than I would do for a real app this simple, but they should give you an idea of how you can do **unit testing**, **integration testing** and **UI testing** whilst steering clear of accidentally testing implementation details.
-
-<div class="shoom" id="fore-7-apollo-example"/>
-### **fore 7** Apollo Example
-[source code (kotlin)](https://github.com/erdo/android-fore/tree/master/example-kt-07apollo) \| [source code (kotlin, Apollo3)](https://github.com/erdo/android-fore/tree/master/example-kt-07apollo3)
-In a similar vein we have a networking sample that integrates with a GraphQL API using Apollo. Includes the ability to chain network calls together, support rotation, handle all error conditions gracefully, and is competely testable / tested (Unit tests and UI tests) and of course has a wafer thin UI layer. The Apollo3 implementation is still experimental.
-
-<div class="shoom" id="fore-8-ktor-example"/>
-### **fore 8** Ktor Example
-[source code (kotlin)](https://github.com/erdo/android-fore/tree/master/example-kt-08ktor)
-Ditto but using Ktor (and OkHttp). And as usual includes the ability to chain network calls together, support rotation, handle all error conditions gracefully, and is competely testable / tested (Unit tests and UI tests)
-
-<div class="shoom" id="fore-6-db-example-room"/>
-### **fore 6** DB Example (Room db driven to-do list)
-
-[video](https://www.youtube.com/watch?v=a1ehGU5O8i8) \| [source code (java)](https://github.com/erdo/android-fore/tree/master/example-jv-06db)
-
-![fore room db sample app](img/fore-android-sample-db.gif)
-
-
-A To-do list on steroids that lets you:
-
-- manually add 50 random todos at a time
-- turn on a "boss mode" which randomly fills your list with even more todos over the following 10 seconds
-- "work from home" which connects to the network and downloads 25 extra todos (up to 9 simultaneous network connections)
-- randomly delete about 10% of your todos
-- randomly change 10% of your outstanding todos to done
-
-It's obviously ridiculously contrived, but the idea is to implement something that would be quite challenging and to see how little code you need in the view layer to do it.
-
-It is driven by a Room db, and there are a few distinct architectural layers: as always there is a view layer and a model layer (in packages: ui and feature). There is also a networking and a persistence layer. The UI layer is driven by the model which in turn is driven by the db.
-
-All the database changes are done away from the UI thread, RecyclerView animations using DiffUtil are supported (for lists below 1000 rows), the app is totally robust and supports rotation out of the box.
-
-There is only one test class included with this app which demonstrates how to test Models which are driven by a Room DB (using CountdownLatches etc). For other test examples, please see sample apps 1-4
-
-
-
-### Other Full App Examples
-
- All the known sample apps are listed in the [github project summary](https://github.com/erdo?tab=projects) for android-fore.
-
-- Many of the **[dev.to](https://dev.to/erdo/tutorial-spot-the-deliberate-bug-165k)** tutorials have full sample apps associated with them, mostly kotlin
-- This sample app uses fore to implement a [clean architecture module](https://github.com/erdo/clean-modules-sample) structure.
-- Slightly larger app also written in Kotlin **[here](https://github.com/erdo/fore-full-example-02-kotlin)**
-
-
-## Contributing
-Please read the [Code of Conduct](https://erdo.github.io/android-fore/CODE-OF-CONDUCT.html#shoom), and check out the [issues](https://github.com/erdo/android-fore/issues) :)
-
+Compose has its own "snapshot state" infrastructure, which aims to [simplify state updating and observation](https://dev.to/zachklipp/a-historical-introduction-to-the-compose-reactive-state-model-19j8), compared to `StateFlow<SomeState>`. I plan to re-implement these sample apps again in Compose to show the difference.
 
 ## License
 
-
     Copyright 2015-2022 early.co
+    Copyright 2022 George Kropotkin
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
