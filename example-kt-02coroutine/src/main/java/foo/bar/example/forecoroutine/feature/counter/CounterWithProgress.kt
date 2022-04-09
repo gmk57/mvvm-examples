@@ -79,9 +79,9 @@ class CounterWithProgress(
 
         logger.i("doThingsWithTheResult() t:" + Thread.currentThread())
 
-        _state.update {
-            it.copy(
-                count = it.count + result,
+        _state.update { currentState ->
+            currentState.copy(
+                count = currentState.count + result,
                 progress = 0,
                 isBusy = false
             )

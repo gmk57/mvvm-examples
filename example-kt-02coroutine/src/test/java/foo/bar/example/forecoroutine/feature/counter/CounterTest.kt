@@ -70,11 +70,8 @@ class CounterTest {
      * to an expected number of times it has changed. (This would be
      * testing an implementation detail and make the tests unnecessarily brittle)
      *
-     * The contract says nothing about how many times the observers will get called,
-     * only that they will be called if something changes ("something" is not defined
-     * and can change between implementations).
-     *
-     * See the reactive UIs section of the fore docs for more information about this
+     * StateFlow conflates updates, so "a slow collector skips fast updates, but
+     * always collects the most recently emitted value".
      *
      * @throws Exception
      */
