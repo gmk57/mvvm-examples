@@ -13,15 +13,18 @@ class Wallet(private val logger: Logger) {
     private val _state = MutableStateFlow(WalletState())
     val state: StateFlow<WalletState> = _state
 
-    fun increaseMobileWallet() = updateMobileWallet { it + 1 }
+    fun increaseMobileWallet() = _state.update { currentState ->
+        if (currentState.canIncrease()) {
+            logger.i("Increasing mobile wallet to:${currentState.mobileWalletAmount + 1}")
+            currentState.copy(mobileWalletAmount = (currentState.mobileWalletAmount + 1))
+        } else currentState
+    }
 
-    fun decreaseMobileWallet() = updateMobileWallet { it - 1 }
-
-    private fun updateMobileWallet(action: (Int) -> Int) = _state.update {
-        it.copy(
-            mobileWalletAmount = action(it.mobileWalletAmount)
-                .coerceIn(0..it.totalDollarsAvailable)
-        ).also { logger.i("Updating mobile wallet to:${it.mobileWalletAmount}") }
+    fun decreaseMobileWallet() = _state.update { currentState ->
+        if (currentState.canDecrease()) {
+            logger.i("Decreasing mobile wallet to:${currentState.mobileWalletAmount - 1}")
+            currentState.copy(mobileWalletAmount = (currentState.mobileWalletAmount - 1))
+        } else currentState
     }
 }
 
