@@ -5,7 +5,6 @@ import foo.bar.example.forereactiveuikt.OG
 import foo.bar.example.forereactiveuikt.feature.wallet.Wallet
 import foo.bar.example.forereactiveuikt.feature.wallet.WalletState
 import io.mockk.every
-import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
@@ -13,67 +12,34 @@ import kotlinx.coroutines.flow.MutableStateFlow
  */
 class StateBuilder internal constructor(private val mockWallet: Wallet) {
 
-    private val mockWalletState: WalletState = mockk()
+    private lateinit var mockWalletState: WalletState
 
     internal fun withMobileWalletMaximum(totalFundsAvailable: Int): StateBuilder {
 
-        every {
-            mockWalletState.mobileWalletAmount
-        } returns totalFundsAvailable
-
-        every {
-            mockWalletState.savingsWalletAmount
-        } returns 0
-
-        every {
-            mockWalletState.canDecrease()
-        } returns true
-
-        every {
-            mockWalletState.canIncrease()
-        } returns false
+        mockWalletState = WalletState(
+            totalDollarsAvailable = totalFundsAvailable,
+            mobileWalletAmount = totalFundsAvailable
+        )
 
         return this
     }
 
     internal fun withMobileWalletHalfFull(savingsWalletAmount: Int, mobileWalletAmount: Int): StateBuilder {
 
-        every {
-            mockWalletState.mobileWalletAmount
-        } returns mobileWalletAmount
-
-        every {
-            mockWalletState.savingsWalletAmount
-        } returns savingsWalletAmount
-
-        every {
-            mockWalletState.canDecrease()
-        } returns true
-
-        every {
-            mockWalletState.canIncrease()
-        } returns true
+        mockWalletState = WalletState(
+            totalDollarsAvailable = savingsWalletAmount + mobileWalletAmount,
+            mobileWalletAmount = mobileWalletAmount
+        )
 
         return this
     }
 
     internal fun withMobileWalletEmpty(totalFundsAvailable: Int): StateBuilder {
 
-        every {
-            mockWalletState.mobileWalletAmount
-        } returns 0
-
-        every {
-            mockWalletState.savingsWalletAmount
-        } returns totalFundsAvailable
-
-        every {
-            mockWalletState.canDecrease()
-        } returns false
-
-        every {
-            mockWalletState.canIncrease()
-        } returns true
+        mockWalletState = WalletState(
+            totalDollarsAvailable = totalFundsAvailable,
+            mobileWalletAmount = 0
+        )
 
         return this
     }
