@@ -39,7 +39,7 @@ I'm migrating Kotlin versions of sample apps one by one, so hopefully the list b
 
 The main goal is to compare different approaches, from the perspective of code clarity, testability, supporting configuration changes, etc.
 
-That's why I make as little changes as possible, and preserve some *fore* parts not related to state management (e.g. logging, service locator). For the same reason *fore* library modules and Java examples are left intact. Original fore-based implementation is kept in [original_fore](/../../tree/original_fore) branch, so you can easily diff branches on GitHub or in IDE.
+That's why I make as little changes as possible, and preserve some *fore* parts not related to state management (e.g. logging, service locator). For the same reason *fore* library modules and Java examples are left intact. Original fore-based implementation is kept in [original_fore](/../../tree/original_fore) branch, so you can easily diff branches [on GitHub](/../../compare/original_fore...stateflow) or in IDE.
 
 ### 1 Reactive UI Example: [description](https://erdo.github.io/android-fore/#fore-1-reactive-ui-example), [code](/example-kt-01reactiveui)
 
