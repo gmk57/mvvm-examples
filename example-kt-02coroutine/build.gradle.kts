@@ -59,7 +59,7 @@ android {
         }
     }
     lint {
-        isAbortOnError = true
+        abortOnError = true
         lintConfig = File(project.rootDir, "lint-example-apps.xml")
     }
 }

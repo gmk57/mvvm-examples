@@ -7,7 +7,7 @@ import java.util.*
 object Shared {
 
     object Android {
-        const val minSdk = 16
+        const val minSdk = 21  // 21+ enables multidex, preventing "Cannot fit requested classes in a single dex file" error
         const val compileSdk = 31
         const val targetSdk = 31
         val javaVersion = JavaVersion.VERSION_1_8
@@ -15,28 +15,28 @@ object Shared {
 
     object Versions {
         // fore core package dependencies
-        const val android_gradle_plugin = "7.0.4"
-        const val kotlin_version = "1.6.10"
+        const val android_gradle_plugin = "7.1.3"
+        const val kotlin_version = "1.6.20"
         const val kotlinx_coroutines_core = "1.6.1"
         // fore optional package dependencies
         const val kotlinx_coroutines_android = "1.6.1"
         const val androidx_lifecycle_common = "2.4.1"
-        const val recyclerview = "1.1.0"
+        const val recyclerview = "1.2.1"
         const val apollo = "2.5.4"
-        const val apollo3 = "3.0.0"
+        const val apollo3 = "3.2.2"
         const val retrofit = "2.9.0"
-        const val compose = "1.1.0"
+        const val compose = "1.1.1"
         // example app and test dependencies
         const val android_core = "1.7.0"
         const val annotation = "1.0.0"
-        const val material = "1.1.0"
-        const val appcompat = "1.1.0"
-        const val coil = "1.1.0"
-        const val androidxtest = "1.4.0-beta01"
-        const val androidxjunit = "1.1.2"
-        const val room_runtime = "2.2.5"
-        const val room_compiler = "2.2.0-rc01"
-        const val room_testing = "2.2.0-rc01"
+        const val material = "1.5.0"
+        const val appcompat = "1.4.1"
+        const val coil = "1.4.0"
+        const val androidxtest = "1.4.0"
+        const val androidxjunit = "1.1.3"
+        const val room_runtime = "2.4.2"
+        const val room_compiler = "2.4.2"
+        const val room_testing = "2.4.2"
         const val espresso_core = "3.5.0-alpha03"
         const val butterknife = "10.2.0"
         const val mockito_core = "2.23.0"
@@ -47,9 +47,9 @@ object Shared {
         const val dexmaker_mockito = "2.28.1"
         const val robolectric = "4.4"
         const val gson = "2.8.5"
-        const val constraintlayout = "1.1.3"
+        const val constraintlayout = "2.1.3"
         const val ktor_client = "1.5.2"
-        const val converter_gson = "2.6.0"
+        const val converter_gson = "2.9.0"
     }
 
     object BuildTypes {
@@ -96,7 +96,7 @@ fun readProperties(propertiesFile: File): Properties {
             propertiesFile.inputStream().use { fis ->
                 load(fis)
             }
-            println("[SECRETS LOADED]\n")
+            println("[SECRETS LOADED]")
         } catch (exception: Exception) {
             println("WARNING $propertiesFile not found! \n")
             println("exception: $exception \n")

@@ -3,7 +3,7 @@ import co.early.fore.Shared.BuildTypes
 
 plugins {
     id("com.android.application")
-    id("com.apollographql.apollo3").version("3.0.0")
+    id("com.apollographql.apollo3").version("3.2.2")
     kotlin("android")
     kotlin("android.extensions")
     kotlin("kapt")
@@ -57,7 +57,7 @@ android {
         }
     }
     lint {
-        isAbortOnError = true
+        abortOnError = true
         lintConfig = File(project.rootDir, "lint-example-apps.xml")
     }
 }
