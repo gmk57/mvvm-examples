@@ -55,6 +55,9 @@ android {
             signingConfig = signingConfigs.getByName(BuildTypes.RELEASE)
         }
     }
+    buildFeatures {
+        viewBinding = true
+    }
     lint {
         abortOnError = true
         lintConfig = File(project.rootDir, "lint-example-apps.xml")
@@ -74,12 +77,17 @@ dependencies {
         implementation(project(":fore-kt-android-adapters"))
     }
 
+    implementation(project(":helpers"))
+
     implementation("androidx.appcompat:appcompat:${Shared.Versions.appcompat}")
     implementation("androidx.recyclerview:recyclerview:${Shared.Versions.recyclerview}")
     implementation("androidx.constraintlayout:constraintlayout:${Shared.Versions.constraintlayout}")
+    implementation("androidx.core:core-ktx:${Shared.Versions.android_core}")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:${Shared.Versions.androidx_lifecycle_common}")
 
     testImplementation("junit:junit:${Shared.Versions.junit}")
     testImplementation("io.mockk:mockk:${Shared.Versions.mockk}")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Shared.Versions.kotlinx_coroutines_core}")
 
     androidTestImplementation("io.mockk:mockk-android:${Shared.Versions.mockk}")
     androidTestImplementation("androidx.test:core:${Shared.Versions.androidxtest}")

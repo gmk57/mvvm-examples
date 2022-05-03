@@ -1,76 +1,61 @@
 package foo.bar.example.foreadapterskt.ui.playlist.immutable
 
-import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
-import androidx.recyclerview.widget.RecyclerView
-import androidx.recyclerview.widget.RecyclerView.NO_POSITION
-import co.early.fore.adapters.Adaptable
-import co.early.fore.adapters.Notifyable
-import co.early.fore.kt.adapters.NotifyableImp
-import foo.bar.example.foreadapterskt.R
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
+import foo.bar.example.foreadapterskt.databinding.ActivityPlaylistsListitemBinding
 import foo.bar.example.foreadapterskt.feature.playlist.Track
+import foo.bar.example.foreadapterskt.feature.playlist.TrackMutable
 import foo.bar.example.foreadapterskt.feature.playlist.immutable.ImmutablePlaylistModel
-import foo.bar.example.foreadapterskt.ui.playlist.immutable.ImmutablePlaylistAdapter.ViewHolder
-import kotlinx.android.synthetic.main.activity_playlists_listitem.view.*
+import gmk57.helpers.BoundHolder
+import gmk57.helpers.viewBinding
 
 /**
  * Copyright © 2015-2021 early.co. All rights reserved.
  */
-class ImmutablePlaylistAdapter(
-        private val immutablePlaylistModel: ImmutablePlaylistModel,
-        private val notifyableImp: NotifyableImp<ViewHolder> = NotifyableImp(diffable = immutablePlaylistModel)
-) :
-        RecyclerView.Adapter<ViewHolder>(),
-        Notifyable<ViewHolder> by notifyableImp,
-        Adaptable<Track> by immutablePlaylistModel {
+class ImmutablePlaylistAdapter(private val immutablePlaylistModel: ImmutablePlaylistModel) :
+    ListAdapter<Track, ImmutablePlaylistAdapter.Holder>(Differ()) {
 
-    init {
-        notifyableImp.initializeAdapter(this)
-    }
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = Holder(parent)
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val view = LayoutInflater.from(parent.context).inflate(R.layout.activity_playlists_listitem, parent, false)
-        return ViewHolder(view)
-    }
+    override fun onBindViewHolder(holder: Holder, position: Int) = holder.bind(getItem(position))
 
-    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+    inner class Holder(parent: ViewGroup) : BoundHolder<ActivityPlaylistsListitemBinding>(
+        parent.viewBinding(ActivityPlaylistsListitemBinding::inflate)
+    ) {
+        private lateinit var item: Track
 
-        val item = immutablePlaylistModel.getItem(position)
-
-        holder.itemView.track_increaseplays_button.setOnClickListener {
-            //if you tap very fast on different rows removing them
-            //while you are using adapter animations you will crash unless
-            //you check for this
-            val betterPosition = holder.adapterPosition
-            if (betterPosition != NO_POSITION) {
-                immutablePlaylistModel.increasePlaysForTrack(betterPosition)
+        init {
+            binding.trackIncreaseplaysButton.setOnClickListener {
+                immutablePlaylistModel.increasePlaysForTrack(item.id)
+            }
+            binding.trackDecreaseplaysButton.setOnClickListener {
+                immutablePlaylistModel.decreasePlaysForTrack(item.id)
+            }
+            binding.trackRemoveButton.setOnClickListener {
+                immutablePlaylistModel.removeTrack(item.id)
             }
         }
 
-        holder.itemView.track_decreaseplays_button.setOnClickListener {
-            val betterPosition = holder.adapterPosition
-            if (betterPosition != NO_POSITION) {
-                immutablePlaylistModel.decreasePlaysForTrack(betterPosition)
+        fun bind(item: Track) {
+            this.item = item
+            binding.apply {
+                root.setBackgroundResource(item.colourResource)
+                trackPlaysrequestedText.text = "${item.numberOfPlaysRequested}"
+                trackIncreaseplaysButton.isEnabled = item.canIncreasePlays()
+                trackDecreaseplaysButton.isEnabled = item.canDecreasePlays()
+                trackPercentVbar.setPercentDone(
+                    item.id,
+                    (item.numberOfPlaysRequested * 100 / TrackMutable.MAX_PLAYS_REQUESTED).toFloat()
+                )
+
             }
         }
-
-        holder.itemView.track_remove_button.setOnClickListener {
-            val betterPosition = holder.adapterPosition
-            if (betterPosition != NO_POSITION) {
-                immutablePlaylistModel.removeTrack(betterPosition)
-            }
-        }
-
-        holder.itemView.setBackgroundResource(item.colourResource)
-        holder.itemView.track_playsrequested_text.text = "${item.numberOfPlaysRequested}"
-        holder.itemView.track_increaseplays_button.isEnabled = item.canIncreasePlays()
-        holder.itemView.track_decreaseplays_button.isEnabled = item.canDecreasePlays()
-        holder.itemView.track_percent_vbar.setPercentDone(
-                item.id,
-                (item.numberOfPlaysRequested*100/Track.MAX_PLAYS_REQUESTED).toFloat()
-        )
     }
 
-    class ViewHolder(view: View) : RecyclerView.ViewHolder(view)
+    private class Differ : DiffUtil.ItemCallback<Track>() {
+        override fun areItemsTheSame(oldItem: Track, newItem: Track) = oldItem.itemsTheSame(newItem)
+        override fun areContentsTheSame(oldItem: Track, newItem: Track) =
+            oldItem.itemsLookTheSame(newItem)
+    }
 }

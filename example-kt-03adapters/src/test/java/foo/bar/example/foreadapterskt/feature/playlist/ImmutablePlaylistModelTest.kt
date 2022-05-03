@@ -1,22 +1,26 @@
 package foo.bar.example.foreadapterskt.feature.playlist
 
-import org.junit.Assert
-import org.junit.Test
-
-import co.early.fore.kt.core.logging.SystemLogger
-import co.early.fore.core.observer.Observer
 import co.early.fore.kt.core.delegate.Fore
 import co.early.fore.kt.core.delegate.TestDelegateDefault
+import co.early.fore.kt.core.logging.SystemLogger
 import foo.bar.example.foreadapterskt.feature.playlist.immutable.ImmutablePlaylistModel
 import io.mockk.MockKAnnotations
+import io.mockk.coVerify
 import io.mockk.mockk
-import io.mockk.verify
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.FlowCollector
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert
 import org.junit.Before
+import org.junit.Test
 
 
 /**
  *
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class ImmutablePlaylistModelTest {
 
     private val logger = SystemLogger()
@@ -32,48 +36,50 @@ class ImmutablePlaylistModelTest {
 
         immutablePlaylistModel = ImmutablePlaylistModel(logger)
     }
-    
+
     @Test
     @Throws(Exception::class)
     fun initialConditions() {
-        
+
         //arrange
-        
+
         //act
 
         //assert
-        Assert.assertEquals(0, immutablePlaylistModel.getItemCount())
-        Assert.assertEquals(false, immutablePlaylistModel.hasObservers())
+        val list = immutablePlaylistModel.state.value
+        Assert.assertEquals(0, list.size)
     }
 
 
     @Test
     @Throws(Exception::class)
     fun addNewTrack() {
-        
+
         //arrange
 
         //act
         immutablePlaylistModel.addNTracks(1)
 
         //assert
-        Assert.assertEquals(1, immutablePlaylistModel.getItemCount())
-        Assert.assertEquals(1, immutablePlaylistModel.getItem(0).numberOfPlaysRequested.toLong())
+        val list = immutablePlaylistModel.state.value
+        Assert.assertEquals(1, list.size)
+        Assert.assertEquals(1, list[0].numberOfPlaysRequested)
     }
 
 
     @Test
     @Throws(Exception::class)
     fun removeTrack() {
-        
+
         //arrange
         immutablePlaylistModel.addNTracks(1)
 
         //act
-        immutablePlaylistModel.removeTrack(0)
+        immutablePlaylistModel.removeTrack(immutablePlaylistModel.state.value[0].id)
 
         //assert
-        Assert.assertEquals(0, immutablePlaylistModel.getItemCount())
+        val list = immutablePlaylistModel.state.value
+        Assert.assertEquals(0, list.size)
     }
 
 
@@ -87,8 +93,9 @@ class ImmutablePlaylistModelTest {
         immutablePlaylistModel.addNTracks(5)
 
         //assert
-        Assert.assertEquals(5, immutablePlaylistModel.getItemCount())
-        Assert.assertEquals(1, immutablePlaylistModel.getItem(4).numberOfPlaysRequested.toLong())
+        val list = immutablePlaylistModel.state.value
+        Assert.assertEquals(5, list.size)
+        Assert.assertEquals(1, list[4].numberOfPlaysRequested)
     }
 
 
@@ -103,7 +110,8 @@ class ImmutablePlaylistModelTest {
         immutablePlaylistModel.removeNTracks(5)
 
         //assert
-        Assert.assertEquals(0, immutablePlaylistModel.getItemCount())
+        val list = immutablePlaylistModel.state.value
+        Assert.assertEquals(0, list.size)
     }
 
 
@@ -113,12 +121,14 @@ class ImmutablePlaylistModelTest {
 
         //arrange
         immutablePlaylistModel.addNTracks(1)
+        val firstTrackId = immutablePlaylistModel.state.value[0].id
 
         //act
-        immutablePlaylistModel.increasePlaysForTrack(0)
+        immutablePlaylistModel.increasePlaysForTrack(firstTrackId)
 
         //assert
-        Assert.assertEquals(2, immutablePlaylistModel.getItem(0).numberOfPlaysRequested.toLong())
+        val list = immutablePlaylistModel.state.value
+        Assert.assertEquals(2, list[0].numberOfPlaysRequested)
     }
 
 
@@ -128,13 +138,15 @@ class ImmutablePlaylistModelTest {
 
         //arrange
         immutablePlaylistModel.addNTracks(1)
-        immutablePlaylistModel.increasePlaysForTrack(0)
+        val firstTrackId = immutablePlaylistModel.state.value[0].id
+        immutablePlaylistModel.increasePlaysForTrack(firstTrackId)
 
         //act
-        immutablePlaylistModel.decreasePlaysForTrack(0)
+        immutablePlaylistModel.decreasePlaysForTrack(firstTrackId)
 
         //assert
-        Assert.assertEquals(1, immutablePlaylistModel.getItem(0).numberOfPlaysRequested.toLong())
+        val list = immutablePlaylistModel.state.value
+        Assert.assertEquals(1, list[0].numberOfPlaysRequested)
     }
 
 
@@ -151,60 +163,100 @@ class ImmutablePlaylistModelTest {
         immutablePlaylistModel.removeAllTracks()
 
         //assert
-        Assert.assertEquals(0, immutablePlaylistModel.getItemCount())
+        val list = immutablePlaylistModel.state.value
+        Assert.assertEquals(0, list.size)
     }
 
 
     /**
      *
-     * NB all we are checking here is that observers are called AT LEAST once
+     * NB all we are checking here is that observers are called AT LEAST twice (first time should
+     * happen immediately after subscription to StateFlow, so "at least once" test would not verify
+     * anything about `addNTracks`).
      *
      * We don't really want tie our tests (OR any observers in production code)
      * to an expected number of times this method might be called. (This would be
      * testing an implementation detail and make the tests unnecessarily brittle)
      *
-     * The contract says nothing about how many times observers will get called,
-     * only that they will be called if something changes ("something" is not defined
-     * and can change between implementations).
-     *
-     * See the databinding readme for more information about this
+     * Using UnconfinedTestDispatcher is recommended for this case, see
+     * https://github.com/Kotlin/kotlinx.coroutines/blob/master/kotlinx-coroutines-test/MIGRATION.md#testcoroutinedispatcher-for-testing-intermediate-emissions
      *
      * @throws Exception
      */
     @Test
     @Throws(Exception::class)
-    fun observersNotifiedAtLeastOnceForAddTrack() {
+    fun observersNotifiedAtLeastOnceForAddTrack() = runTest(dispatchTimeoutMs = 1000) {
 
         //arrange
-        val mockObserver: Observer = mockk(relaxed = true)
-        immutablePlaylistModel.addObserver(mockObserver)
+        val mockObserver: FlowCollector<List<Track>> = mockk(relaxed = true)
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) {
+            immutablePlaylistModel.state.collect(mockObserver)
+        }
+
+        //act
+        immutablePlaylistModel.addNTracks(1)
+        job.cancel()  // prevents leaking infinite collection of StateFlow
+
+        //assert
+        coVerify(atLeast = 2) {
+            mockObserver.emit(any())
+        }
+    }
+
+    /**
+     * Another approach would be to test that state has changed after calling `addNTracks`.
+     *
+     * If state has changed, but our observers weren't called, this is probably a bug either in
+     * registering them or in StateFlow, but not in ImmutablePlaylistModel.
+     */
+    @Test
+    fun stateChangedForAddTrack() = runTest {
+
+        //arrange
+        val initialState = immutablePlaylistModel.state.value
 
         //act
         immutablePlaylistModel.addNTracks(1)
 
         //assert
-        verify(atLeast = 1) {
-            mockObserver.somethingChanged()
-        }
+        Assert.assertNotEquals(initialState, immutablePlaylistModel.state.value)
     }
 
 
     @Test
     @Throws(Exception::class)
-    fun observersNotifiedAtLeastOnceForIncreasePlays() {
+    fun observersNotifiedAtLeastOnceForIncreasePlays() = runTest(dispatchTimeoutMs = 1000) {
 
         //arrange
         immutablePlaylistModel.addNTracks(1)
-        val mockObserver: Observer = mockk(relaxed = true)
-        immutablePlaylistModel.addObserver(mockObserver)
+        val mockObserver: FlowCollector<List<Track>> = mockk(relaxed = true)
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) {
+            immutablePlaylistModel.state.collect(mockObserver)
+        }
+        val firstTrackId = immutablePlaylistModel.state.value[0].id
 
         //act
-        immutablePlaylistModel.increasePlaysForTrack(0)
+        immutablePlaylistModel.increasePlaysForTrack(firstTrackId)
+        job.cancel()  // prevents leaking infinite collection of StateFlow
 
         //assert
-        verify(atLeast = 1) {
-            mockObserver.somethingChanged()
+        coVerify(atLeast = 2) {
+            mockObserver.emit(any())
         }
     }
 
+    @Test
+    fun stateChangedForIncreasePlay() = runTest {
+
+        //arrange
+        immutablePlaylistModel.addNTracks(1)
+        val initialState = immutablePlaylistModel.state.value
+        val firstTrackId = initialState[0].id
+
+        //act
+        immutablePlaylistModel.increasePlaysForTrack(firstTrackId)
+
+        //assert
+        Assert.assertNotEquals(initialState, immutablePlaylistModel.state.value)
+    }
 }

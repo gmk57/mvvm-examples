@@ -53,6 +53,14 @@ In tests, instead of verifying that observer was called, we should check that st
 
 Production code got rid of checking `Fore.getWorkMode()` in `delay()`, `launchMain()` and `awaitDefault()`. Instead, we use `TestDispatcher` and `runTest()` from `kotlinx-coroutines-test` library to advance virtual time step by step. The only adjustment of production code specifically for testing is a `backgroundDispatcher` (here a top-level property, but normally passed via dependency injection).
 
+### 3 Adapter Example: [description](https://erdo.github.io/android-fore/#fore-3-adapter-example), [code](/example-kt-03adapters)
+
+Kotlin version originally had three different pairs of Models & Adapters to show different techniques. The fourth one probably wouldn't fit on the screen, so I converted the "immutable" part: `Track` is truly immutable now, `ImmutablePlaylistModel` exposes `StateFlow<List<Track>>` and `ImmutablePlaylistAdapter` extends Google's `ListAdapter` & uses ViewBinding. As a result, code became simpler on each level.
+
+I also replaced index-based operations with id-based ones, because it looks like a more robust & scalable solution (despite the cost of scanning lists). In a real app we would probably store tracks in a database (maybe with `Paging` library if there is a lot of them), and then we would need to pass ids anyway.
+
+As for the testing, there is again less mocking and more using a real `List<Track>`. Testing `StateFlow` emissions [is a](https://github.com/Kotlin/kotlinx.coroutines/issues/3120) [bit](https://github.com/Kotlin/kotlinx.coroutines/issues/3143) [tricky](https://github.com/Kotlin/kotlinx.coroutines/blob/master/kotlinx-coroutines-test/MIGRATION.md#testcoroutinedispatcher-for-testing-intermediate-emissions), and it feels a bit like testing `StateFlow` itself. Alternatively, we can just compare state before and after operation. I've also added some tests for RecyclerView items, with Espresso & [custom Matcher](https://stackoverflow.com/a/72105818).
+
 ## Jetpack Compose
 
 Compose has its own "snapshot state" infrastructure, which aims to [simplify state updating and observation](https://dev.to/zachklipp/a-historical-introduction-to-the-compose-reactive-state-model-19j8), compared to `StateFlow<SomeState>`. I plan to re-implement these sample apps again in Compose to show the difference.

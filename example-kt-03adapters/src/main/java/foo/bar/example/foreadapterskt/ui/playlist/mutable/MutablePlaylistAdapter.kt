@@ -9,7 +9,7 @@ import co.early.fore.adapters.Adaptable
 import co.early.fore.adapters.Notifyable
 import co.early.fore.kt.adapters.NotifyableImp
 import foo.bar.example.foreadapterskt.R
-import foo.bar.example.foreadapterskt.feature.playlist.Track
+import foo.bar.example.foreadapterskt.feature.playlist.TrackMutable
 import foo.bar.example.foreadapterskt.feature.playlist.mutable.MutablePlaylistModel
 import foo.bar.example.foreadapterskt.ui.playlist.mutable.MutablePlaylistAdapter.*
 import kotlinx.android.synthetic.main.activity_playlists_listitem.view.*
@@ -23,7 +23,7 @@ class MutablePlaylistAdapter(
 ) :
         RecyclerView.Adapter<ViewHolder>(),
         Notifyable<ViewHolder> by notifyableImp,
-        Adaptable<Track> by mutablePlaylistModel {
+        Adaptable<TrackMutable> by mutablePlaylistModel {
 
     init {
         notifyableImp.initializeAdapter(this)
@@ -68,7 +68,7 @@ class MutablePlaylistAdapter(
         holder.itemView.track_decreaseplays_button.isEnabled = item.canDecreasePlays()
         holder.itemView.track_percent_vbar.setPercentDone(
                 item.id,
-                (item.numberOfPlaysRequested*100/Track.MAX_PLAYS_REQUESTED).toFloat()
+                (item.numberOfPlaysRequested*100/TrackMutable.MAX_PLAYS_REQUESTED).toFloat()
         )
     }
 

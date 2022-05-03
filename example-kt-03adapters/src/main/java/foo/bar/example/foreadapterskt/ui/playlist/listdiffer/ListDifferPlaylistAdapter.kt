@@ -12,9 +12,8 @@ import co.early.fore.kt.core.logging.Logger
 import foo.bar.example.foreadapterskt.R
 import foo.bar.example.foreadapterskt.feature.playlist.RandomStuffGeneratorUtil
 import foo.bar.example.foreadapterskt.feature.playlist.RandomStuffGeneratorUtil.randomLong
-import foo.bar.example.foreadapterskt.feature.playlist.Track
+import foo.bar.example.foreadapterskt.feature.playlist.TrackMutable
 import kotlinx.android.synthetic.main.activity_playlists_listitem.view.*
-import java.util.ArrayList
 
 
 /**
@@ -56,12 +55,12 @@ class ListDifferPlaylistAdapter(
         private val logger: Logger
 ) : RecyclerView.Adapter<ListDifferPlaylistAdapter.ViewHolder>() {
 
-    val itemCallback: DiffUtil.ItemCallback<Track> = object : DiffUtil.ItemCallback<Track>() {
-        override fun areItemsTheSame(oldItem: Track, newItem: Track): Boolean {
+    val itemCallback: DiffUtil.ItemCallback<TrackMutable> = object : DiffUtil.ItemCallback<TrackMutable>() {
+        override fun areItemsTheSame(oldItem: TrackMutable, newItem: TrackMutable): Boolean {
             return oldItem.itemsTheSame(newItem)
         }
 
-        override fun areContentsTheSame(oldItem: Track, newItem: Track): Boolean {
+        override fun areContentsTheSame(oldItem: TrackMutable, newItem: TrackMutable): Boolean {
             return oldItem.itemsLookTheSame(newItem)
         }
     }
@@ -110,9 +109,9 @@ class ListDifferPlaylistAdapter(
 
     fun addNTracks(n: Int) {
         logger.i("addNTracks() n:$n")
-        val newTracks = ArrayList<Track>()
+        val newTracks = ArrayList<TrackMutable>()
         for (ii in 0 until n) {
-            newTracks.add(Track(RandomStuffGeneratorUtil.generateRandomColourResource(), randomLong()))
+            newTracks.add(TrackMutable(RandomStuffGeneratorUtil.generateRandomColourResource(), randomLong()))
         }
         val mutableList = getListCopy()
         mutableList.addAll(newTracks)
@@ -142,7 +141,7 @@ class ListDifferPlaylistAdapter(
         return differ.currentList.size >= n
     }
 
-    private fun getListCopy(): MutableList<Track> {
+    private fun getListCopy(): MutableList<TrackMutable> {
         val listCopy = differ.currentList.map { it.deepCopy() } //deep copy
         return listCopy.toMutableList()
     }
@@ -186,7 +185,7 @@ class ListDifferPlaylistAdapter(
         holder.itemView.track_decreaseplays_button.isEnabled = item.canDecreasePlays()
         holder.itemView.track_percent_vbar.setPercentDone(
                 item.id,
-                (item.numberOfPlaysRequested*100/Track.MAX_PLAYS_REQUESTED).toFloat()
+                (item.numberOfPlaysRequested*100/TrackMutable.MAX_PLAYS_REQUESTED).toFloat()
         )
     }
 

@@ -3,14 +3,13 @@ package foo.bar.example.foreadapterskt.feature.playlist.mutable
 import co.early.fore.adapters.Adaptable
 import co.early.fore.adapters.mutable.ChangeAwareList
 import co.early.fore.adapters.mutable.Updateable
-import co.early.fore.kt.core.logging.Logger
 import co.early.fore.core.observer.Observable
 import co.early.fore.kt.adapters.mutable.ChangeAwareArrayList
+import co.early.fore.kt.core.logging.Logger
 import co.early.fore.kt.core.observer.ObservableImp
 import foo.bar.example.foreadapterskt.feature.playlist.RandomStuffGeneratorUtil.generateRandomColourResource
 import foo.bar.example.foreadapterskt.feature.playlist.RandomStuffGeneratorUtil.randomLong
-import foo.bar.example.foreadapterskt.feature.playlist.Track
-import java.util.ArrayList
+import foo.bar.example.foreadapterskt.feature.playlist.TrackMutable
 
 /**
  * Example model based on **mutable** list data
@@ -19,10 +18,10 @@ import java.util.ArrayList
  */
 class MutablePlaylistModel(
         private val logger: Logger,
-        private val trackList: ChangeAwareList<Track> = ChangeAwareArrayList()
+        private val trackList: ChangeAwareList<TrackMutable> = ChangeAwareArrayList()
 ) : Observable by ObservableImp(),
     Updateable by trackList,
-    Adaptable<Track> {
+    Adaptable<TrackMutable> {
 
     fun removeTrack(index: Int) {
         logger.i("removeTrack() $index")
@@ -53,9 +52,9 @@ class MutablePlaylistModel(
 
     fun addNTracks(n: Int) {
         logger.i("addNTracks() n:$n")
-        val newTracks = ArrayList<Track>()
+        val newTracks = ArrayList<TrackMutable>()
         for (ii in 0 until n) {
-            newTracks.add(Track(generateRandomColourResource(), randomLong()))
+            newTracks.add(TrackMutable(generateRandomColourResource(), randomLong()))
         }
         trackList.addAll(newTracks)
         logger.i("addNTracks() updated")
@@ -78,7 +77,7 @@ class MutablePlaylistModel(
         return trackList.size >= n
     }
 
-    override fun getItem(index: Int): Track {
+    override fun getItem(index: Int): TrackMutable {
         checkIndex(index)
         return trackList[index]
     }
