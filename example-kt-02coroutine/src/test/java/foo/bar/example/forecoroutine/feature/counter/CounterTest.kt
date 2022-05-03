@@ -5,6 +5,7 @@ import co.early.fore.kt.core.delegate.TestDelegateDefault
 import co.early.fore.kt.core.logging.SystemLogger
 import gmk57.helpers.backgroundDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -16,6 +17,7 @@ import org.junit.Test
 /**
  * Copyright © 2019 early.co. All rights reserved.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class CounterTest {
 
     @Before

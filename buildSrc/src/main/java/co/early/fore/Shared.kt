@@ -37,12 +37,13 @@ object Shared {
         const val room_runtime = "2.4.2"
         const val room_compiler = "2.4.2"
         const val room_testing = "2.4.2"
-        const val espresso_core = "3.5.0-alpha03"
+        // 3.5.0-alpha03 is broken, see https://issuetracker.google.com/issues/204506297
+        // 3.5.0-alpha06 is broken, see https://github.com/android/android-test/issues/1351
+        const val espresso_core = "3.5.0-alpha05"
         const val butterknife = "10.2.0"
         const val mockito_core = "2.23.0"
         const val mockk = "1.11.0"
         const val junit = "4.12"
-        const val espresso = "3.0.2"
         const val hamcrest_library = "1.3"
         const val dexmaker_mockito = "2.28.1"
         const val robolectric = "4.4"
