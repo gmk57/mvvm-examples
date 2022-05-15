@@ -59,7 +59,7 @@ Kotlin version originally had three different pairs of Models & Adapters to show
 
 I also replaced index-based operations with id-based ones, because it looks like a more robust & scalable solution (despite the cost of scanning lists). In a real app we would probably store tracks in a database (maybe with `Paging` library if there is a lot of them), and then we would need to pass ids anyway.
 
-As for the testing, there is again less mocking and more using a real `List<Track>`. Testing `StateFlow` emissions [is a](https://github.com/Kotlin/kotlinx.coroutines/issues/3120) [bit](https://github.com/Kotlin/kotlinx.coroutines/issues/3143) [tricky](https://github.com/Kotlin/kotlinx.coroutines/blob/master/kotlinx-coroutines-test/MIGRATION.md#testcoroutinedispatcher-for-testing-intermediate-emissions), and it feels a bit like testing `StateFlow` itself. Alternatively, we can just compare state before and after operation. I've also added some tests for RecyclerView items, with Espresso & [custom Matcher](https://stackoverflow.com/a/72105818).
+As for the testing, there is again less mocking and more using a real `List<Track>`. Testing `StateFlow` emissions [is a](https://github.com/Kotlin/kotlinx.coroutines/issues/3120) [bit](https://github.com/Kotlin/kotlinx.coroutines/issues/3143) [tricky](https://github.com/Kotlin/kotlinx.coroutines/blob/master/kotlinx-coroutines-test/MIGRATION.md#testcoroutinedispatcher-for-testing-intermediate-emissions), and it feels like testing `StateFlow` itself. Alternatively, we can just compare state before and after operation. I've also added some tests for RecyclerView items, with Espresso & [custom Matcher](https://stackoverflow.com/a/72105818).
 
 ## Jetpack Compose
 

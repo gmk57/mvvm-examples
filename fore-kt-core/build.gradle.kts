@@ -17,18 +17,19 @@ ext.apply {
 
 println("[${ext.get("LIB_ARTIFACT_ID")} build file]")
 
-sourceSets["main"].java.apply {
-    srcDirs(
-        "../fore-jv-core/src/main/java"
-    )
-    exclude(
-        "co/early/fore/core/logging/**",
-        "co/early/fore/core/observer/ObservableGroupImp.java",
-        "co/early/fore/core/ui/trigger/Trigger.java"
-    )
-}
+//sourceSets["main"].java.apply {
+//    srcDirs(
+//        "../fore-jv-core/src/main/java"
+//    )
+//    exclude(
+//        "co/early/fore/core/logging/**",
+//        "co/early/fore/core/observer/ObservableGroupImp.java",
+//        "co/early/fore/core/ui/trigger/Trigger.java"
+//    )
+//}
 
 dependencies {
+    api(project(":fore-jv-core"))
     api("org.jetbrains.kotlin:kotlin-stdlib-jdk8:${Shared.Versions.kotlin_version}")
     api("org.jetbrains.kotlinx:kotlinx-coroutines-core:${Shared.Versions.kotlinx_coroutines_core}")
 }

@@ -19,21 +19,22 @@ android {
             consumerProguardFiles("../proguard-library-consumer-network.pro")
         }
     }
-    sourceSets["main"].java.apply {
-        srcDirs(
-                "../fore-jv-android-network/src/main/java"
-        )
-        exclude(
-                "co/early/fore/net/apollo/CallProcessorApollo.java",
-                "co/early/fore/net/apollo/ApolloCaller.java",
-                "co/early/fore/net/retrofit2/CallProcessorRetrofit2.java",
-                "co/early/fore/net/retrofit2/Retrofit2Caller.java"
-        )
-    }
+//    sourceSets["main"].java.apply {
+//        srcDirs(
+//                "../fore-jv-android-network/src/main/java"
+//        )
+//        exclude(
+//                "co/early/fore/net/apollo/CallProcessorApollo.java",
+//                "co/early/fore/net/apollo/ApolloCaller.java",
+//                "co/early/fore/net/retrofit2/CallProcessorRetrofit2.java",
+//                "co/early/fore/net/retrofit2/Retrofit2Caller.java"
+//        )
+//    }
 }
 
 dependencies {
 
+    api(project(":fore-jv-android-network"))
     api(project(":fore-kt-network"))
     api(project(":fore-kt-android-core"))
     compileOnly("com.apollographql.apollo:apollo-runtime:${Shared.Versions.apollo}")
