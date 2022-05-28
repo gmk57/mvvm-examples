@@ -1,18 +1,29 @@
 package foo.bar.example.foreretrofitkt.feature.fruit
 
-import co.early.fore.core.observer.Observer
-import co.early.fore.kt.core.callbacks.FailureWithPayload
-import co.early.fore.kt.core.callbacks.Success
 import co.early.fore.kt.core.delegate.Fore
 import co.early.fore.kt.core.delegate.TestDelegateDefault
 import co.early.fore.kt.core.logging.SystemLogger
+import foo.bar.example.foreretrofitkt.api.CustomGlobalErrorHandler
 import foo.bar.example.foreretrofitkt.api.fruits.FruitPojo
 import foo.bar.example.foreretrofitkt.api.fruits.FruitService
 import foo.bar.example.foreretrofitkt.message.ErrorMessage
+import gmk57.helpers.backgroundDispatcher
 import io.mockk.MockKAnnotations
+import io.mockk.coVerify
 import io.mockk.impl.annotations.MockK
-import io.mockk.verify
-import org.junit.Assert
+import io.mockk.mockk
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.FlowCollector
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 
@@ -22,28 +33,20 @@ import org.junit.Test
  *
  *
  * 1) Construction: we check that the model is constructed in the correct state
- * 2) Receiving data: we check that the model behaves appropriately when receiving various success and fail responses from the CallProcessor
+ * 2) Receiving data: we check that the model behaves appropriately when receiving various success and fail responses from the FruitService
  * 3) Observers and State: we check that the model updates its observers correctly and presents its current state accurately
  *
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class FruitFetcherUnitTest {
 
     private val fruitPojo = FruitPojo("strawberry", false, 71)
 
     @MockK
-    private lateinit var mockSuccess: Success
-
-    @MockK
-    private lateinit var mockFailureWithPayload: FailureWithPayload<ErrorMessage>
-
-    @MockK
-    private lateinit var mockCallProcessorRetrofit2: co.early.fore.kt.net.retrofit2.CallProcessorRetrofit2<ErrorMessage>
+    private lateinit var mockErrorHandler: CustomGlobalErrorHandler
 
     @MockK
     private lateinit var mockFruitService: FruitService
-
-    @MockK
-    private lateinit var mockObserver: Observer
 
 
     @Before
@@ -53,131 +56,147 @@ class FruitFetcherUnitTest {
         // make the code run synchronously, reroute Log.x to
         // System.out.println() so we see it in the test log
         Fore.setDelegate(TestDelegateDefault())
+        val dispatcher = StandardTestDispatcher()
+        Dispatchers.setMain(dispatcher)
+        backgroundDispatcher = dispatcher
     }
 
 
     @Test
     @Throws(Exception::class)
     fun initialConditions() {
+        logger.i("initialConditions started")
 
         //arrange
-        val fruitFetcher = FruitFetcher(
-            mockFruitService,
-            mockCallProcessorRetrofit2,
-            logger
-        )
+        val fruitFetcher = FruitFetcher(mockFruitService, mockErrorHandler, logger)
 
         //act
 
         //assert
-        Assert.assertEquals(false, fruitFetcher.isBusy)
-        Assert.assertEquals(0, fruitFetcher.currentFruit.tastyPercentScore.toLong())
-        Assert.assertEquals(false, fruitFetcher.currentFruit.isCitrus)
+        val fetcherState = fruitFetcher.state.value
+        assertEquals(false, fetcherState.isBusy)
+        assertEquals(0, fetcherState.currentFruit.tastyPercentScore.toLong())
+        assertEquals(false, fetcherState.currentFruit.isCitrus)
+        logger.i("initialConditions finished")
     }
 
 
     @Test
     @Throws(Exception::class)
-    fun fetchFruit_MockSuccess() {
+    fun fetchFruit_MockSuccess() = runTest {
+        logger.i("fetchFruit_MockSuccess started")
 
         //arrange
-        StateBuilder(mockCallProcessorRetrofit2).getFruitSuccess(fruitPojo)
-        val fruitFetcher = FruitFetcher(
-            mockFruitService,
-            mockCallProcessorRetrofit2,
-            logger
-        )
+        StateBuilder(mockFruitService, mockErrorHandler).getFruitSuccess(fruitPojo)
+        val fruitFetcher = FruitFetcher(mockFruitService, mockErrorHandler, logger)
 
 
         //act
-        fruitFetcher.fetchFruitsAsync(mockSuccess, mockFailureWithPayload)
+        fruitFetcher.fetchFruitsAsync()
+        advanceUntilIdle()
 
 
         //assert
-        verify(exactly = 1) {
-            mockSuccess()
-        }
-        verify(exactly = 0) {
-            mockFailureWithPayload(any())
-        }
-        Assert.assertEquals(false, fruitFetcher.isBusy)
-        Assert.assertEquals(fruitPojo.name, fruitFetcher.currentFruit.name)
-        Assert.assertEquals(fruitPojo.isCitrus, fruitFetcher.currentFruit.isCitrus)
-        Assert.assertEquals(
-            fruitPojo.tastyPercentScore.toLong(),
-            fruitFetcher.currentFruit.tastyPercentScore.toLong()
-        )
+        val fetcherState = fruitFetcher.state.value
+        assertEquals(false, fetcherState.isBusy)
+        assertEquals(fruitPojo, fetcherState.currentFruit)
+        assertEquals(Unit, fetcherState.success?.consume())
+        assertNull(fetcherState.error)
+        logger.i("fetchFruit_MockSuccess finished")
     }
 
 
     @Test
     @Throws(Exception::class)
-    fun fetchFruit_MockFailure() {
+    fun fetchFruit_MockFailure() = runTest {
+        logger.i("fetchFruit_MockFailure started")
 
         //arrange
-        StateBuilder(mockCallProcessorRetrofit2).getFruitFail(ErrorMessage.ERROR_FRUIT_USER_LOGIN_CREDENTIALS_INCORRECT)
-        val fruitFetcher = FruitFetcher(
-            mockFruitService,
-            mockCallProcessorRetrofit2,
-            logger
-        )
+        StateBuilder(mockFruitService, mockErrorHandler)
+            .getFruitFail(ErrorMessage.ERROR_FRUIT_USER_LOGIN_CREDENTIALS_INCORRECT)
+        val fruitFetcher = FruitFetcher(mockFruitService, mockErrorHandler, logger)
 
 
         //act
-        fruitFetcher.fetchFruitsButFailAdvanced(mockSuccess, mockFailureWithPayload)
-
+        fruitFetcher.fetchFruitsButFailAdvanced()
+        advanceUntilIdle()
 
         //assert
-        verify(exactly = 0) {
-            mockSuccess()
-        }
-        verify(exactly = 1) {
-            mockFailureWithPayload(eq(ErrorMessage.ERROR_FRUIT_USER_LOGIN_CREDENTIALS_INCORRECT))
-        }
-        Assert.assertEquals(false, fruitFetcher.isBusy)
-        Assert.assertEquals(false, fruitFetcher.currentFruit.isCitrus)
-        Assert.assertEquals(0, fruitFetcher.currentFruit.tastyPercentScore.toLong())
+        val fetcherState = fruitFetcher.state.value
+        assertEquals(false, fetcherState.isBusy)
+        assertEquals(false, fetcherState.currentFruit.isCitrus)
+        assertEquals(0, fetcherState.currentFruit.tastyPercentScore.toLong())
+        assertNull(fetcherState.success)
+        assertEquals(
+            ErrorMessage.ERROR_FRUIT_USER_LOGIN_CREDENTIALS_INCORRECT,
+            fetcherState.error?.consume()
+        )
+        logger.i("fetchFruit_MockFailure finished")
     }
 
 
     /**
-     *
-     * NB all we are checking here is that observers are called AT LEAST once
+     * NB all we are checking here is that observers are called AT LEAST twice (first time should
+     * happen immediately after subscription to StateFlow, so "at least once" test would not verify
+     * anything about `fetchFruitsAsync`).
      *
      * We don't really want tie our tests (OR any observers in production code)
      * to an expected number of times this method might be called. (This would be
      * testing an implementation detail and make the tests unnecessarily brittle)
      *
-     * The contract says nothing about how many times the observers will get called,
-     * only that they will be called if something changes ("something" is not defined
-     * and can change between implementations).
-     *
-     * See the databinding docs for more information about this
-     *
-     * @throws Exception
+     * Using UnconfinedTestDispatcher is recommended for this case, see
+     * https://github.com/Kotlin/kotlinx.coroutines/blob/master/kotlinx-coroutines-test/MIGRATION.md#testcoroutinedispatcher-for-testing-intermediate-emissions
      */
     @Test
-    @Throws(Exception::class)
-    fun observersNotifiedAtLeastOnce() {
+    fun observersNotifiedAtLeastOnce() = runTest(dispatchTimeoutMs = 1000) {
+        logger.i("observersNotifiedAtLeastOnce started")
 
         //arrange
-        StateBuilder(mockCallProcessorRetrofit2).getFruitSuccess(fruitPojo)
-        val fruitFetcher = FruitFetcher(
-            mockFruitService,
-            mockCallProcessorRetrofit2,
-            logger
-        )
-        fruitFetcher.addObserver(mockObserver)
+        StateBuilder(mockFruitService, mockErrorHandler).getFruitSuccess(fruitPojo)
+        val fruitFetcher = FruitFetcher(mockFruitService, mockErrorHandler, logger)
+
+        val mockObserver: FlowCollector<FruitFetcherState> = mockk(relaxed = true)
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) {
+            fruitFetcher.state.collect(mockObserver)
+        }
 
 
         //act
-        fruitFetcher.fetchFruitsAsync(mockSuccess, mockFailureWithPayload)
+        fruitFetcher.fetchFruitsAsync()
+        job.cancel()  // prevents leaking infinite collection of StateFlow
 
 
         //assert
-        verify(atLeast = 1) {
-            mockObserver.somethingChanged()
+        coVerify(atLeast = 2) {
+            mockObserver.emit(any())
         }
+        logger.i("observersNotifiedAtLeastOnce finished")
+    }
+
+    /**
+     * Another approach would be to test that state has changed after calling `fetchFruitsAsync`.
+     *
+     * If state has changed, but our observers weren't called, this is probably a bug either in
+     * registering them or in StateFlow, but not in FruitFetcher.
+     */
+    @Test
+    fun stateHasChanged() = runTest {
+        logger.i("stateHasChanged started")
+
+        //arrange
+        StateBuilder(mockFruitService, mockErrorHandler).getFruitSuccess(fruitPojo)
+        val fruitFetcher = FruitFetcher(mockFruitService, mockErrorHandler, logger)
+        val initialState = fruitFetcher.state.value
+
+
+        //act
+        fruitFetcher.fetchFruitsAsync()
+
+
+        //assert
+        val fetcherState = fruitFetcher.state.value
+        assertNotEquals(initialState, fetcherState)
+        logger.i("stateHasChanged finished")
     }
 
     companion object {

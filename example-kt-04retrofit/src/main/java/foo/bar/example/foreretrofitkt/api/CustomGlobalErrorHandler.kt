@@ -4,8 +4,14 @@ import co.early.fore.kt.core.logging.Logger
 import co.early.fore.net.MessageProvider
 import com.google.gson.Gson
 import foo.bar.example.foreretrofitkt.message.ErrorMessage
-import foo.bar.example.foreretrofitkt.message.ErrorMessage.*
-import okhttp3.Request
+import foo.bar.example.foreretrofitkt.message.ErrorMessage.ERROR_CLIENT
+import foo.bar.example.foreretrofitkt.message.ErrorMessage.ERROR_MISC
+import foo.bar.example.foreretrofitkt.message.ErrorMessage.ERROR_NETWORK
+import foo.bar.example.foreretrofitkt.message.ErrorMessage.ERROR_RATE_LIMITED
+import foo.bar.example.foreretrofitkt.message.ErrorMessage.ERROR_SECURITY_UNKNOWN
+import foo.bar.example.foreretrofitkt.message.ErrorMessage.ERROR_SERVER
+import foo.bar.example.foreretrofitkt.message.ErrorMessage.ERROR_SESSION_TIMED_OUT
+import retrofit2.HttpException
 import retrofit2.Response
 import java.io.InputStreamReader
 import java.io.UnsupportedEncodingException
@@ -14,23 +20,24 @@ import java.io.UnsupportedEncodingException
  * You can probably use this class almost as it is for your own app, but you might want to
  * customise the behaviour for specific HTTP codes etc, hence it's not in the fore library
  */
-class CustomGlobalErrorHandler(private val logWrapper: Logger) : co.early.fore.net.retrofit2.ErrorHandler<ErrorMessage> {
+class CustomGlobalErrorHandler(private val logWrapper: Logger) {
 
+    // separate method to prevent "Not enough information to infer type variable CE" when `customErrorClazz` is null
+    fun handleError(exception: Exception) =
+        handleError<MessageProvider<ErrorMessage>>(exception, null)
 
-    override fun <CE : MessageProvider<ErrorMessage>> handleError(
-            t: Throwable?,
-            errorResponse: Response<*>?,
-            customErrorClazz: Class<CE>?,
-            originalRequest: Request?
+    fun <CE : MessageProvider<ErrorMessage>> handleError(
+        exception: Exception,
+        customErrorClazz: Class<CE>?,
     ): ErrorMessage {
 
         var message = ERROR_MISC
 
-        if (errorResponse != null) {
+        if (exception is HttpException) {
 
-            logWrapper.e("handleError() HTTP:" + errorResponse.code())
+            logWrapper.e("handleError() HTTP:" + exception.code())
 
-            when (errorResponse.code()) {
+            when (exception.code()) {
 
                 401 -> message = ERROR_SESSION_TIMED_OUT
 
@@ -42,24 +49,23 @@ class CustomGlobalErrorHandler(private val logWrapper: Logger) : co.early.fore.n
                 404, 500, 503 -> message = ERROR_SERVER
             }
 
-            if (customErrorClazz != null) {
+            val errorResponse = exception.response()
+            if (customErrorClazz != null && errorResponse != null) {
                 //let's see if we can get more specifics about the error
                 message = parseCustomError(message, errorResponse, customErrorClazz)
             }
 
         } else {//non HTTP error, probably some connection problem, but might be JSON parsing related also
 
-            logWrapper.e("handleError() throwable:$t")
+            logWrapper.e("handleError() exception:$exception")
 
-            if (t != null) {
-
-                message = when (t) {
-                    is com.google.gson.stream.MalformedJsonException -> ERROR_SERVER
-                    is java.net.UnknownServiceException -> ERROR_SECURITY_UNKNOWN
-                    else -> ERROR_NETWORK
-                }
-                t.printStackTrace()
+            message = when (exception) {
+                is com.google.gson.stream.MalformedJsonException -> ERROR_SERVER
+                is com.google.gson.JsonSyntaxException -> ERROR_SERVER  // for tests: Gson.fromJson() wraps most exceptions in it
+                is java.net.UnknownServiceException -> ERROR_SECURITY_UNKNOWN
+                else -> ERROR_NETWORK
             }
+//            exception.printStackTrace()
         }
 
 
@@ -70,9 +76,9 @@ class CustomGlobalErrorHandler(private val logWrapper: Logger) : co.early.fore.n
 
 
     private fun <CE : MessageProvider<ErrorMessage>> parseCustomError(
-            provisionalErrorMessage: ErrorMessage,
-            errorResponse: Response<*>,
-            customErrorClazz: Class<CE>
+        provisionalErrorMessage: ErrorMessage,
+        errorResponse: Response<*>,
+        customErrorClazz: Class<CE>
     ): ErrorMessage {
 
         val gson = Gson()

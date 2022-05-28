@@ -21,32 +21,43 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import retrofit2.Retrofit
+import java.util.concurrent.TimeUnit
 
 
 /**
  * This is a slightly more end-to-end style of test, but without actually connecting to a network
  *
+ * Similar to [FruitFetcherIntegrationTest], but using [MockWebServer] instead of
+ * [InterceptorStubbedService]. Differences:
  *
- * Using [InterceptorStubbedService] we
- * replace the server response with a canned response taken from static text files saved
- * in /resources. This all happens in OkHttp land so the model under test is not aware of any
- * difference.
+ * 1) A bit closer to real life: requests pass unintercepted, mocking happens on the "server" side
  *
+ * 2) MockWebServer can serve multiple (different) responses, emulate network delays, save requests
+ * made by an app for verification, etc
+ *
+ * 3) There is no natural way to throw specific `IOException`s, but `SocketTimeoutException` can be
+ * emulated by skipping `mockWebServer.enqueue(response)`.
+ *
+ * 4) To test timeouts efficiently we can decrease OkHttp timeout settings from its default 10 sec.
  *
  * As usual for tests, we replace `Main` dispatcher with a `TestDispatcher`.
  *
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-class FruitFetcherIntegrationTest {
+class FruitFetcherMockWebServerTest {
 
     private val logger = SystemLogger()
     private val interceptorLogging = InterceptorLogging(logger)
     private val errorHandler = CustomGlobalErrorHandler(logger)
+    private lateinit var mockWebServer: MockWebServer
 
 
     @Before
@@ -61,6 +72,10 @@ class FruitFetcherIntegrationTest {
         backgroundDispatcher = dispatcher
     }
 
+    @After
+    fun tearDown() {
+        mockWebServer.shutdown()
+    }
 
     /**
      * Here we are making sure that the model correctly handles a successful server response
@@ -173,7 +188,7 @@ class FruitFetcherIntegrationTest {
      */
     @Test
     @Throws(Exception::class)
-    fun fetchFruit_CommonFailures() = runTest(dispatchTimeoutMs = 1000) {
+    fun fetchFruit_CommonFailures() = runTest(dispatchTimeoutMs = 5000) {
         logger.i("fetchFruit_CommonFailures started")
 
         for (stubbedServiceDefinition in CommonServiceFailures()) {
@@ -207,17 +222,40 @@ class FruitFetcherIntegrationTest {
             assertNull(fetcherState.success)
             assertEquals(stubbedServiceDefinition.expectedResult, fetcherState.error?.consume())
             logger.i("------- Common Service Failure finished")
+
+            @Suppress("BlockingMethodInNonBlockingContext")
+            mockWebServer.shutdown()
         }
 
         logger.i("fetchFruit_CommonFailures finished")
     }
 
 
-    private fun stubbedRetrofit(stubbedServiceDefinition: StubbedServiceDefinition<*>): Retrofit {
-        return CustomRetrofitBuilder.create {
-            addInterceptor(InterceptorStubbedService(stubbedServiceDefinition))
-            addInterceptor(interceptorLogging)
+    private fun stubbedRetrofit(definition: StubbedServiceDefinition<*>): Retrofit {
+        // new MockWebServer for each iteration in fetchFruit_CommonFailures,
+        // otherwise responses get messed up
+        mockWebServer = MockWebServer()
+        mockWebServer.start()
+
+        if (definition.successfullyConnected()) {
+            val bodyString = readTestResourceFile(definition.resourceFileName)
+            val response = MockResponse()
+                .setResponseCode(definition.httpCode)
+                .setBody(bodyString)
+                .addHeader("Content-Type", definition.mimeType)
+            mockWebServer.enqueue(response)
         }
+
+        val url: String = mockWebServer.url("/").toString()
+        return CustomRetrofitBuilder.create(url) {
+            addInterceptor(interceptorLogging)
+            readTimeout(500, TimeUnit.MILLISECONDS)
+        }
+    }
+
+    private fun readTestResourceFile(fileName: String): String {
+        val fileInputStream = javaClass.classLoader?.getResourceAsStream(fileName)
+        return fileInputStream?.bufferedReader()?.readText() ?: ""
     }
 
     companion object {

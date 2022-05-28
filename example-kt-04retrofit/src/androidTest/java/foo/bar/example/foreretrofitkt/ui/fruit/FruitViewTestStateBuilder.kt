@@ -1,4 +1,3 @@
-
 package foo.bar.example.foreretrofitkt.ui.fruit
 
 import androidx.test.core.app.ApplicationProvider
@@ -8,18 +7,22 @@ import foo.bar.example.foreretrofitkt.OG
 import foo.bar.example.foreretrofitkt.ProgressBarIdler
 import foo.bar.example.foreretrofitkt.api.fruits.FruitPojo
 import foo.bar.example.foreretrofitkt.feature.fruit.FruitFetcher
+import foo.bar.example.foreretrofitkt.feature.fruit.FruitFetcherState
 import io.mockk.every
+import kotlinx.coroutines.flow.MutableStateFlow
 
 
 class FruitViewTestStateBuilder internal constructor(private val mockFruitFetcher: FruitFetcher) {
 
+    private var fruitFetcherState = FruitFetcherState()
+
     internal fun isBusy(busy: Boolean): FruitViewTestStateBuilder {
-        every { mockFruitFetcher.isBusy } returns (busy)
+        fruitFetcherState = fruitFetcherState.copy(isBusy = busy)
         return this
     }
 
     internal fun hasFruit(fruitPojo: FruitPojo): FruitViewTestStateBuilder {
-        every { mockFruitFetcher.currentFruit } returns (fruitPojo)
+        fruitFetcherState = fruitFetcherState.copy(currentFruit = fruitPojo)
         return this
     }
 
@@ -27,6 +30,8 @@ class FruitViewTestStateBuilder internal constructor(private val mockFruitFetche
 
         return object : ActivityTestRule<FruitActivity>(FruitActivity::class.java) {
             override fun beforeActivityLaunched() {
+
+                every { mockFruitFetcher.state } returns MutableStateFlow(fruitFetcherState)
 
                 //get hold of the application
                 val app = ApplicationProvider.getApplicationContext() as App

@@ -74,13 +74,20 @@ dependencies {
         implementation(project(":fore-kt-android-network"))
     }
 
-    implementation("com.squareup.retrofit2:retrofit:${Shared.Versions.retrofit}")
-    implementation("com.squareup.retrofit2:converter-gson:${Shared.Versions.converter_gson}")
+    implementation(project(":helpers"))
+
     implementation("androidx.appcompat:appcompat:${Shared.Versions.appcompat}")
     implementation("androidx.constraintlayout:constraintlayout:${Shared.Versions.constraintlayout}")
+    implementation("androidx.core:core-ktx:${Shared.Versions.android_core}")
+    implementation("com.squareup.okhttp3:okhttp:${Shared.Versions.okhttp}")
+    implementation("com.squareup.retrofit2:retrofit:${Shared.Versions.retrofit}")
+    implementation("com.squareup.retrofit2:converter-gson:${Shared.Versions.converter_gson}")
 
     testImplementation("junit:junit:${Shared.Versions.junit}")
     testImplementation("io.mockk:mockk:${Shared.Versions.mockk}")
+    testImplementation("com.squareup.okhttp3:mockwebserver:${Shared.Versions.okhttp}")
+    testImplementation("com.squareup.retrofit2:retrofit-mock:${Shared.Versions.retrofit}")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Shared.Versions.kotlinx_coroutines_core}")
 
     androidTestImplementation("io.mockk:mockk-android:${Shared.Versions.mockk}")
     androidTestImplementation("androidx.test:core:${Shared.Versions.androidxtest}")

@@ -4,13 +4,11 @@ import android.app.Application
 import co.early.fore.kt.core.logging.AndroidLogger
 import co.early.fore.kt.core.logging.SilentLogger
 import co.early.fore.kt.net.InterceptorLogging
-import co.early.fore.kt.net.retrofit2.CallProcessorRetrofit2
 import foo.bar.example.foreretrofitkt.api.CustomGlobalErrorHandler
 import foo.bar.example.foreretrofitkt.api.CustomGlobalRequestInterceptor
 import foo.bar.example.foreretrofitkt.api.CustomRetrofitBuilder
 import foo.bar.example.foreretrofitkt.api.fruits.FruitService
 import foo.bar.example.foreretrofitkt.feature.fruit.FruitFetcher
-import java.util.*
 
 
 /**
@@ -32,20 +30,15 @@ object OG {
         val logger = if (BuildConfig.DEBUG) AndroidLogger("fore_") else SilentLogger()
 
         // networking classes common to all models
-        val retrofit = CustomRetrofitBuilder.create(
-            CustomGlobalRequestInterceptor(logger),
-            InterceptorLogging(logger)
-        )//logging interceptor should be the last one
-
-        val callProcessor = CallProcessorRetrofit2(
-            errorHandler = CustomGlobalErrorHandler(logger),
-            logger = logger
-        )
+        val retrofit = CustomRetrofitBuilder.create {
+            addInterceptor(CustomGlobalRequestInterceptor(logger))
+            addInterceptor(InterceptorLogging(logger))
+        }//logging interceptor should be the last one
 
         // models
         val fruitFetcher = FruitFetcher(
             retrofit.create(FruitService::class.java),
-            callProcessor,
+            CustomGlobalErrorHandler(logger),
             logger
         )
 

@@ -1,7 +1,6 @@
 package foo.bar.example.foreretrofitkt.api
 
 import com.google.gson.GsonBuilder
-import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -17,27 +16,27 @@ import retrofit2.converter.gson.GsonConverterFactory
 object CustomRetrofitBuilder {
 
     /**
-     *
-     * @param interceptors list of interceptors NB if you add a logging interceptor, it has to be
-     * the last one in the list
+     * Here we heed to customise Retrofit baseUrl (for testing with MockWebServer) and OkHttp
+     * configuration (interceptors, timeouts)
      * @return Retrofit object suitable for instantiating service interfaces
      */
-    fun create(vararg interceptors: Interceptor): Retrofit {
+    fun create(
+        url: String = "http://www.mocky.io/v2/",
+        okHttpConfig: OkHttpClient.Builder.() -> Unit = {}
+    ): Retrofit {
 
         return Retrofit.Builder()
-            .baseUrl("http://www.mocky.io/v2/")
+            .baseUrl(url)
             .addConverterFactory(GsonConverterFactory.create(GsonBuilder().create()))
-            .client(createOkHttpClient(*interceptors))
+            .client(createOkHttpClient(okHttpConfig))
             .build()
     }
 
-    private fun createOkHttpClient(vararg interceptors: Interceptor): OkHttpClient {
+    private fun createOkHttpClient(okHttpConfig: OkHttpClient.Builder.() -> Unit): OkHttpClient {
 
         val builder = OkHttpClient.Builder()
 
-        for (interceptor in interceptors) {
-            builder.addInterceptor(interceptor)
-        }
+        builder.okHttpConfig()
 
         return builder.build()
     }

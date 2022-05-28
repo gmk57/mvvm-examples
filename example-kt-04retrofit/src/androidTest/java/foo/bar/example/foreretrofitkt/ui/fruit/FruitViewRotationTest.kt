@@ -2,23 +2,25 @@ package foo.bar.example.foreretrofitkt.ui.fruit
 
 import android.app.Activity
 import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.view.View
 import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.assertion.ViewAssertions.matches
-import androidx.test.espresso.matcher.ViewMatchers.*
+import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
+import androidx.test.espresso.matcher.ViewMatchers.isEnabled
+import androidx.test.espresso.matcher.ViewMatchers.withId
+import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
-import co.early.fore.kt.core.Either
-import co.early.fore.kt.core.callbacks.FailureWithPayload
-import co.early.fore.kt.core.callbacks.Success
 import co.early.fore.kt.core.logging.Logger
 import co.early.fore.kt.core.logging.SystemLogger
 import foo.bar.example.foreretrofitkt.EspressoTestMatchers.withDrawable
 import foo.bar.example.foreretrofitkt.R
+import foo.bar.example.foreretrofitkt.api.CustomGlobalErrorHandler
 import foo.bar.example.foreretrofitkt.api.fruits.FruitPojo
 import foo.bar.example.foreretrofitkt.api.fruits.FruitService
 import foo.bar.example.foreretrofitkt.feature.fruit.FruitFetcher
-import foo.bar.example.foreretrofitkt.message.ErrorMessage
 import io.mockk.MockKAnnotations
 import io.mockk.impl.annotations.MockK
 import kotlinx.coroutines.CompletableDeferred
@@ -26,8 +28,6 @@ import org.hamcrest.Matchers.not
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.util.*
-import java.util.concurrent.CountDownLatch
 
 
 /**
@@ -54,19 +54,12 @@ class FruitViewRotationTest {
     private var fruitPojo = FruitPojo("testFruit1", true, 45)
 
     @MockK
-    private lateinit var mockSuccess: Success
+    lateinit var errorHandler: CustomGlobalErrorHandler
 
     @MockK
-    private lateinit var mockFailureWithPayload: FailureWithPayload<ErrorMessage>
+    lateinit var mockFruitService: FruitService
 
-    @MockK
-    lateinit var mockCallProcessorRetrofit2: co.early.fore.kt.net.retrofit2.CallProcessorRetrofit2<ErrorMessage>
-
-    @MockK
-    private lateinit var mockFruitService: FruitService
-
-    private lateinit var deferredResult: CompletableDeferred<Either<ErrorMessage, List<FruitPojo>>>
-    private val countDownLatch = CountDownLatch(1)
+    private lateinit var deferredResult: CompletableDeferred<List<FruitPojo>>
 
     @Before
     fun setUp() {
@@ -78,7 +71,7 @@ class FruitViewRotationTest {
         //construct a real model with mock dependencies
         fruitFetcher = FruitFetcher(
             mockFruitService,
-            mockCallProcessorRetrofit2,
+            errorHandler,
             logger
         )
     }
@@ -98,7 +91,7 @@ class FruitViewRotationTest {
         checkUIBeforeClick(activity)
 
         //act
-        fruitFetcher.fetchFruitsAsync(mockSuccess, mockFailureWithPayload)
+        onView(withId(R.id.fruit_fetchsuccess_btn)).perform(click())
 
         checkUIWhenFetching(activity)
 
@@ -108,32 +101,25 @@ class FruitViewRotationTest {
 
         completeDeferredResult()
 
-        try {
-            countDownLatch.await()
-        } catch (e: InterruptedException) {
-        }
-
         checkUIOnceComplete(activity)
     }
 
 
-    fun completeDeferredResult() {
+    private fun completeDeferredResult() {
 
         logger.i("callSuccessOnCachedSuccessFailCallback()")
 
-        val fruitList = ArrayList<FruitPojo>()
-        fruitList.add(fruitPojo)
+        val fruitList = listOf(fruitPojo)
 
         //we need to be back on the UI thread for this
         getInstrumentation().runOnMainSync {
             logger.i("about to call success, id:" + Thread.currentThread().id)
 
-            deferredResult.complete(Either.right(fruitList))
-            countDownLatch.countDown()
+            deferredResult.complete(fruitList)
         }
     }
 
-    fun setDeferredResult(deferredResult: CompletableDeferred<Either<ErrorMessage, List<FruitPojo>>>) {
+    fun setDeferredResult(deferredResult: CompletableDeferred<List<FruitPojo>>) {
         logger.i("setDeferredResult()")
         this.deferredResult = deferredResult
     }
@@ -210,11 +196,12 @@ class FruitViewRotationTest {
     }
 
     private fun swapOrientation(activity: Activity) {
+        logger.i("swapOrientation")
         activity.requestedOrientation =
-            if (activity.requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_PORTRAIT) {
-                ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-            } else {
+            if (activity.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
                 ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            } else {
+                ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
             }
     }
 
